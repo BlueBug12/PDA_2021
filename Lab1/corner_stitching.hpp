@@ -33,7 +33,7 @@ class CornerStitching{
         CornerStitching & operator = (CornerStitching const &) = default;
         CornerStitching & operator = (CornerStitching &&) = default;
         ~CornerStitching() = default;
-        Tile* findPoint(int x, int y);
+        Tile* findPoint(int x, int y, Tile *hint =NULL);
         void countNeighbor(Tile* t, int& space_num, int& block_num);        
         bool searchArea(int left_x, int bottom_y, int width, int height);
         bool insertTile(Tile* t);
@@ -47,6 +47,12 @@ class CornerStitching{
         Tile* searchV(Tile* t_ptr, const int y);
         inline bool crossOverlapping(Tile* space, Tile* block);
         bool mergeSpace(Tile* pre, Tile* cur);
+
+        inline void updateLeftNeighbor(Tile* t, Tile* temp = NULL);
+        inline void updateRightNeighbor(Tile* t, Tile* temp = NULL);
+        inline void updateTopNeighbor(Tile* t, Tile* temp = NULL);
+        inline void updateBottomNeighbor(Tile* t, Tile* temp = NULL);
+        void updateAllNeighbor(Tile* t);
 
     private:
         const int _width;
