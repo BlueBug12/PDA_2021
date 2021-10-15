@@ -1,17 +1,24 @@
 CXX := g++
-CXXFLAGS := -std=c++11 -g -Wall -O3
 TARGET := main
-OBJ := main.o corner_stitching.o
+SRCDIR := ./src
+OBJDIR := ./obj
+CXXFLAGS := -std=c++11 -g -Wall -O3
+SRCS := $(notdir $(wildcard ${SRCDIR}/*.cpp))
+OBJS := $(addprefix $(OBJDIR)/, $(patsubst %.cpp, %.o, $(SRCS)))
+SRCS := $(addprefix $(SRCDIR)/, $(SRCS))
 
-all: $(TARGET)
 
-$(TARGET): $(OBJ)
+$(shell [ -d $(OBJDIR) ] || mkdir -p $(OBJDIR))
+
+all: $(TARGET) $(OBJS)
+
+$(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-%.o: $.cpp 
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp 
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
-	rm -rf *.o $(TARGET)
+	rm -rf $(OBJDIR)/*.o $(TARGET)
 

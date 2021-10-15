@@ -203,9 +203,11 @@ bool CornerStitching::insertTile(Tile* t){
 }
 
 
-bool CornerStitching::insertTile(const int x, const int y, const int width, const int height, const int i){
+Tile * CornerStitching::insertTile(const int x, const int y, const int width, const int height, const int i){
     Tile* t = new Tile(x,y,width,height,i);
-    return insertTile(t);
+    _tile_num++;
+    insertTile(t);
+    return t;
 }
 
 std::vector<Tile> CornerStitching::collectAllTiles(){}
@@ -234,7 +236,7 @@ void CornerStitching::topSplit(Tile* space, Tile* block){
     //set t2 as the space that doesn't contain block
     Tile* t1 = space;
     Tile* t2 = new Tile(t1); 
-
+    _tile_num++;
     t2->y = block->topY();
     t2->height = t1->topY() - block->topY();
     t2->lb = t1;
@@ -275,6 +277,7 @@ void CornerStitching::bottomSplit(Tile* space, Tile* block){
     //set t2 as the space that doesn't contain block
     Tile* t1 = space;
     Tile* t2 = new Tile(t1); 
+    _tile_num++;
 
     t2->height = block->y - t2->y;
     t2->rt = t1;
@@ -354,6 +357,7 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
         updateLeftNeighbor(block, top->bl); 
         
         delete top;
+        _tile_num--;
 
     }else if(r_width == 0){//the right edge of space is aligned with the right edge of block
         if(first)
@@ -383,6 +387,7 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
         r_top = top;
     }else{
         r_top = new Tile(top);
+        _tile_num++;
         l_top = top;
         if(first)
             block->tr = r_top;
@@ -438,6 +443,7 @@ bool CornerStitching::mergeSpace(Tile* pre, Tile* cur){
         updateTopNeighbor(cur);
 
         delete pre;
+        _tile_num--;
         return true;
     }else{
         return false;

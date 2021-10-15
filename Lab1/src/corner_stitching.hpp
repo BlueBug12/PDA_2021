@@ -1,6 +1,6 @@
 #ifndef CORNER_STITCHING_HPP 
 #define CORNER_STITCHING_HPP
-//define DEBUG
+//#define DEBUG
 #include <vector>
 #include <iostream>
 #include "tile.hpp"
@@ -37,7 +37,7 @@ class CornerStitching{
         void countNeighbor(Tile* t, int& space_num, int& block_num);        
         bool searchArea(int left_x, int bottom_y, int width, int height);
         bool insertTile(Tile* t);
-        bool insertTile(const int x, const int y, const int width, const int height, const int i = -1);
+        Tile * insertTile(const int x, const int y, const int width, const int height, const int i = -1);
         void insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre_l, Tile* pre_r);
         std::vector<Tile> collectAllTiles();
         void vSplit(Tile & t);
@@ -53,6 +53,7 @@ class CornerStitching{
         inline void updateTopNeighbor(Tile* t, Tile* temp = NULL);
         inline void updateBottomNeighbor(Tile* t, Tile* temp = NULL);
         void updateAllNeighbor(Tile* t);
+        int getTileNum(){return _tile_num;}
 
     private:
         const int _width;
