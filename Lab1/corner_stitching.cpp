@@ -65,9 +65,9 @@ Tile* CornerStitching::searchH(Tile* t_ptr, const int x){
     std::cout<<"  searchH:"<<t_ptr->x<<" "<<t_ptr->y<<std::endl;
 #endif
     int state = inTileH(*t_ptr,x);
-    if(state==0)//x is in the range of tile t
+    if(state == 0)//x is in the range of tile t
         return t_ptr;
-    if(state==-1)//the position of tile t is at right hand side of x
+    else if(state == -1)//the position of tile t is at right hand side of x
         return searchH(t_ptr->bl,x);
     else//the position of tile t is at left hand side of x
         return searchH(t_ptr->tr,x);
@@ -82,12 +82,14 @@ Tile* CornerStitching::searchV(Tile* t_ptr, const int y){
     std::cout<<"  searchV:"<<t_ptr->x<<" "<<t_ptr->y<<std::endl;
 #endif
     int state = inTileV(*t_ptr,y);
-    if(state==0)//y is in the range of tile t
+    if(state == 0)//y is in the range of tile t
         return t_ptr;
-    else if(state==-1)//the position of tile t is higher than y
+    else if(state == -1){//the position of tile t is higher than y
         return searchV(t_ptr->lb,y);
-    else// the positio of tile t is lower than y
-        return searchH(t_ptr->rt,y);
+    }
+    else{// the positio of tile t is lower than y
+        return searchV(t_ptr->rt,y);
+    }
 }
 
 inline void counter(const Tile* t, int& space_num, int& block_num){

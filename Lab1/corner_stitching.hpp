@@ -1,11 +1,11 @@
 #ifndef CORNER_STITCHING_HPP 
 #define CORNER_STITCHING_HPP
-#define DEBUG
+//define DEBUG
 #include <vector>
 #include <iostream>
 #include "tile.hpp"
 
-inline int inTileH(Tile & t, int x){
+inline int inTileH(Tile & t, const int x){
     if(x >= t.x && x <= t.rightX())//x is in the range of tile t
         return 0;
     else if(x < t.x)//the position of tile t is at right hand side of x
@@ -14,7 +14,7 @@ inline int inTileH(Tile & t, int x){
         return 1;
 }
 
-inline bool inTileV(Tile & t, int y){
+inline int inTileV(Tile & t, const int y){
     if(y >= t.y && y <= t.topY())//y is in the range of the tile t
         return 0;
     else if(y < t.y)//the position of tile t is higher than y
