@@ -1,5 +1,5 @@
 CXX := g++
-TARGET := main
+TARGET := Lab1
 SRCDIR := ./src
 OBJDIR := ./obj
 CXXFLAGS := -std=c++11 -g -Wall -O3
