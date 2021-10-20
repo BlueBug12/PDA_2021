@@ -1,5 +1,58 @@
 #include "corner_stitching.hpp"
 
+inline int inTileH(Tile & t, const int x){
+    if(x >= t.x && x < t.rightX())//x is in the range of tile t
+        return 0;
+    else if(x < t.x)//the position of tile t is at right hand side of x
+        return -1;
+    else//the position of tile t is at left hand side of x
+        return 1;
+}
+
+inline int inTileV(Tile & t, const int y){
+    if(y > t.y && y <= t.topY())//y is in the range of the tile t
+        return 0;
+    else if(y <= t.y)//the position of tile t is higher than y
+        return -1;
+    else//the position of tile t is lower than y
+        return 1;
+}
+
+void check(Tile *t){
+    Tile *temp = t->bl;
+    if(temp && (temp->rightX()!=t->x || temp->topY()<=t->y || temp->y > t->y)){
+        std::cerr<<"Error: found wrong pointer when check left."<<std::endl;
+        std::cerr<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+        std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+        exit(1);
+    }
+
+    temp = t->tr;
+    if(temp && (temp->x!=t->rightX() || temp->topY()<t->topY() || temp->y >= t->topY())){
+        std::cerr<<"Error: found wrong pointer when check right."<<std::endl;
+        std::cerr<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+        std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+        exit(1);
+    }
+
+    temp = t->rt;
+    if(temp && (temp->y!=t->topY() || temp->x >= t->rightX() || temp->rightX() < t->rightX())){
+        std::cerr<<"Error: found wrong pointer when check top."<<std::endl;
+        std::cerr<<t->x<<" "<<t->y<<" "<<t->rightX()<<" "<<t->topY()<<" "<<t->index<<std::endl;
+        std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+        exit(1);
+    }
+
+    temp = t->lb;
+    if(temp && (temp->topY()!=t->y || temp->rightX() <= t->x || temp->x > t->x)){
+        std::cerr<<"Error: found wrong pointer when check bottom."<<std::endl;
+        std::cerr<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+        std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+        exit(1);
+    }
+
+}
+
 void debugger(Tile* t){
     
         if(t->tr)
@@ -21,11 +74,12 @@ void debugger(Tile* t){
 }
 CornerStitching::CornerStitching(int width, int height):_width(width), _height(height){
     _start_tile = new Tile(0,0,_width,_height,-1);
+    all.insert(_start_tile);
     _tile_num = 1;
 }
 
-Tile* CornerStitching::findPoint(int x, int y, Tile *hint){
 
+Tile* CornerStitching::findPoint(int x, int y, Tile *hint){
     //be careful of corner case(point at edge))
     if(x>_width || x<0 || y>_height || y<0){
         std::cout << "Warning: findPoint out of range." << std::endl;
@@ -37,21 +91,6 @@ Tile* CornerStitching::findPoint(int x, int y, Tile *hint){
        hint = searchH(hint, x);
        hint = searchV(hint, y);
     }
-    //deal with the corner cases:
-    //case1: the point is at the right edge of tile (not a corner point)
-    if(x == hint->rightX()){
-        hint = hint->tr;
-        while(hint->y >= y)
-            hint = hint->lb;
-    }else if(y == hint->y){//case2: the point is at the bottom edge of tile (not a corner point)
-        hint = hint->lb;
-        while(hint->rightX() <= x)
-            hint = hint->tr;
-    }
-    //case3.1: the point is at bottom-right corner
-    //case3.2: the point is at bottom-left corner
-    //case3.3: the point is at top-right corner
-    //all case3s are included in the previoud code.
     return hint;
 }
 
@@ -61,9 +100,6 @@ Tile* CornerStitching::searchH(Tile* t_ptr, const int x){
         exit(1);
     }
 
-#ifdef DEBUG
-    std::cout<<"  searchH:"<<t_ptr->x<<" "<<t_ptr->y<<std::endl;
-#endif
     int state = inTileH(*t_ptr,x);
     if(state == 0)//x is in the range of tile t
         return t_ptr;
@@ -78,18 +114,13 @@ Tile* CornerStitching::searchV(Tile* t_ptr, const int y){
         std::cerr<<"Error: NULL pointer in searchV."<<std::endl;
         exit(1);
     }
-#ifdef DEBUG
-    std::cout<<"  searchV:"<<t_ptr->x<<" "<<t_ptr->y<<std::endl;
-#endif
     int state = inTileV(*t_ptr,y);
     if(state == 0)//y is in the range of tile t
         return t_ptr;
-    else if(state == -1){//the position of tile t is higher than y
+    else if(state == -1)//the position of tile t is higher than y
         return searchV(t_ptr->lb,y);
-    }
-    else{// the positio of tile t is lower than y
+    else// the positio of tile t is lower than y
         return searchV(t_ptr->rt,y);
-    }
 }
 
 inline void counter(const Tile* t, int& space_num, int& block_num){
@@ -136,67 +167,60 @@ bool CornerStitching::searchArea(int left_x, int bottom_y, int width, int height
 }
 
 bool CornerStitching::insertTile(Tile* t){
-    std::cout<<"insert tile "<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+    std::cout<<"insert tile "<<t->index<<std::endl;
     if(!searchArea(t->x,t->y,t->width,t->height))
         return false;
     //search the tile that contains top edge
     Tile* top = findPoint((t->x + t->width/2),t->topY());//set the top-center of tile as target position
-#ifdef DEBUG
-    std::cout<<t->x+t->width/2<<","<<t->topY()<<"  findPoint top tile:"<<top->x<<" "<<top->y<<std::endl;
-#endif
     topSplit(top,t);
 
     //search the tile that contains bottom edge
     Tile* bottom = findPoint((t->x + t->width/2),t->y+1);//+1 to avoid corner case
-#ifdef DEBUG
-    std::cout<<t->x+t->width/2<<","<<t->y+1<<"  findPoint bottom tile:"<<bottom->x<<" "<<bottom->y<<std::endl;
-#endif
     bottomSplit(bottom,t);
-    /*
-    Tile *pre_l = top->bl;
-    Tile *pre_r = top->tr;
-    while(pre_l && pre_l->y < top->topY())
-        pre_l = pre_l->rt;    
-    pre_r = findPoint(t->rightX()+1,t->topY()+1,top);
-    */
 
-    insertTile(top,bottom,t,NULL,NULL);
+    Tile *pre_l = findPoint(t->x-1,t->topY()+1,top);
+    Tile *pre_r = findPoint(t->rightX(),t->topY()+1,top);
+
+    insertTile(top,bottom,t,pre_l,pre_r);
     tiles.push_back(t); 
     _start_tile = tiles.front();
-    
-    #ifdef DEBUG
+
+#ifdef DEBUG
     for(size_t i=0;i<tiles.size();++i){
         t = tiles.at(i); 
-        int space_num, block_num;
-        countNeighbor(t,space_num,block_num);
+        int space_num = 0;
+        int block_num = 0;
+        //countNeighbor(t,space_num,block_num);
         std::cout<<"    Tile "<<t->index<<std::endl;
         std::cout<<"    Counting result: "<<block_num<<" "<<space_num<<std::endl;
         if(t->tr){
             std::cout<<"    tr: "<<t->tr->x<<" "<<t->tr->y<<" "<<t->tr->width<<" "<<t->tr->height<<" "<<t->tr->index<<std::endl;
-            debugger(t->tr);
+            //debugger(t->tr);
         }
         else
             std::cout<<"    tr: "<<"NULL"<<std::endl;
         if(t->rt){
             std::cout<<"    rt: "<<t->rt->x<<" "<<t->rt->y<<" "<<t->rt->width<<" "<<t->rt->height<<" "<<t->rt->index<<std::endl;
-            debugger(t->rt);
+            //debugger(t->rt);
         }
         else
             std::cout<<"    rt: "<<"NULL"<<std::endl;
         if(t->bl){
             std::cout<<"    bl: "<<t->bl->x<<" "<<t->bl->y<<" "<<t->bl->width<<" "<<t->bl->height<<" "<<t->bl->index<<std::endl;
-            debugger(t->bl);
+            //debugger(t->bl);
         }
         else
             std::cout<<"    bl: "<<"NULL"<<std::endl;
         if(t->lb){
             std::cout<<"    lb: "<<t->lb->x<<" "<<t->lb->y<<" "<<t->lb->width<<" "<<t->lb->height<<" "<<t->lb->index<<std::endl;
-            debugger(t->lb);
+            //debugger(t->lb);
         }
         else
             std::cout<<"    lb: "<<"NULL"<<std::endl;
     }
-    #endif
+    for(Tile* it: all)
+        check(it);
+#endif
 
     return true;
 
@@ -205,20 +229,14 @@ bool CornerStitching::insertTile(Tile* t){
 
 Tile * CornerStitching::insertTile(const int x, const int y, const int width, const int height, const int i){
     Tile* t = new Tile(x,y,width,height,i);
+    all.insert(t);
     _tile_num++;
     insertTile(t);
     return t;
 }
 
-std::vector<Tile> CornerStitching::collectAllTiles(){}
-
 
 void CornerStitching::topSplit(Tile* space, Tile* block){
-    /*
-    if(y == space->y || y == space->y+t->height){
-        std::cerr<<"Error: no need to splitH."<<std::endl;
-        exit(1);
-    }*/
     
     if(space->index!=-1){
         std::cerr<<"Error: the tile is not a space."<<std::endl;
@@ -232,10 +250,10 @@ void CornerStitching::topSplit(Tile* space, Tile* block){
         updateTopNeighbor(block);
         return;
     }
-
     //set t2 as the space that doesn't contain block
     Tile* t1 = space;
     Tile* t2 = new Tile(t1); 
+    all.insert(t2);
     _tile_num++;
     t2->y = block->topY();
     t2->height = t1->topY() - block->topY();
@@ -248,7 +266,15 @@ void CornerStitching::topSplit(Tile* space, Tile* block){
     updateRightNeighbor(t2);
 
     t1->height = block->topY() - t1->y;
+#ifdef DEBUG
+    if(t1==t2){
+        std::cerr<<"Error: t1==t2"<<std::endl;
+        std::cerr<<t1->x<<" "<<t1->y<<std::endl;
+        exit(1);
+    }
+#endif
     t1->rt = t2;
+    
     while(t1->tr && t1->tr->y >= t1->topY())
        t1->tr = t1->tr->lb;
 
@@ -256,11 +282,6 @@ void CornerStitching::topSplit(Tile* space, Tile* block){
 }
 
 void CornerStitching::bottomSplit(Tile* space, Tile* block){
-    /*if(y == space->y || y == space->y+t->height){
-        std::cerr<<"Error: no need to splitH."<<std::endl;
-        exit(1);
-    }*/
-    
     if(space->index!=-1){
         std::cerr<<"Error: the tile is not a space."<<std::endl;
         exit(1);
@@ -277,9 +298,17 @@ void CornerStitching::bottomSplit(Tile* space, Tile* block){
     //set t2 as the space that doesn't contain block
     Tile* t1 = space;
     Tile* t2 = new Tile(t1); 
+    all.insert(t2);
     _tile_num++;
 
     t2->height = block->y - t2->y;
+#ifdef DEBUG
+    if(t1==t2){
+        std::cerr<<"Error: t1==t2"<<std::endl;
+        std::cerr<<t1->x<<" "<<t1->y<<std::endl;
+        exit(1);
+    }
+#endif
     t2->rt = t1;
     while(t2->tr && t2->tr->y >= t2->topY())
        t2->tr = t2->tr->lb;
@@ -296,10 +325,6 @@ void CornerStitching::bottomSplit(Tile* space, Tile* block){
 
     block->lb = t2;
 
-#ifdef DEBUG
-    std::cout<<"bottom split t1:"<<t1->x<<" "<<t1->y<<std::endl;
-    std::cout<<"bottom split t2:"<<t2->x<<" "<<t2->y<<std::endl;
-#endif
 }
 
 inline bool CornerStitching::crossOverlapping(Tile* space, Tile* block){
@@ -316,8 +341,9 @@ inline bool CornerStitching::crossOverlapping(Tile* space, Tile* block){
         return false;
 }
 
+
 void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre_l, Tile* pre_r){
-    if(!top){
+    if(!top){//merge the previous tile except the first time
         if(pre_l)
             mergeSpace(pre_l, pre_l->lb);
         if(pre_r)
@@ -352,10 +378,20 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
             block->tr = top->tr;
         if(!next)
             block->bl = top->bl;
-        
-        updateRightNeighbor(block, top->tr);
-        updateLeftNeighbor(block, top->bl); 
-        
+       
+        Tile *temp = top->tr;
+        while(temp && temp->bl == top){
+            temp->bl = block;
+            temp = temp->lb;
+        }
+
+        temp = top->bl;
+        while(temp && temp->tr == top){
+            temp->tr = block;
+            temp = temp->rt;
+        }
+
+        all.erase(top);
         delete top;
         _tile_num--;
 
@@ -365,12 +401,16 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
         if(!next)
             block->bl = top;
         
-        updateRightNeighbor(block, top->tr);
+        Tile *temp = top->tr;
+        while(temp && temp->bl == top){
+            temp->bl = block;
+            temp = temp->lb;
+        }
 
         top->width -= block->width;
         top->tr = block;
-        while(top->rt && top->rt->x >= top->rightX())
-            top->rt = top->rt->bl;
+
+        top->rt = pre_l;
         l_top = top;
     }else if(l_width == 0){//the left edge of space is aligned with the right edge of block
         if(first)
@@ -378,21 +418,27 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
         if(!next)
             block->bl = top->bl;
         
-        updateLeftNeighbor(block, top->bl);
+        Tile *temp = top->bl;
+        while(temp && temp->tr == top){
+            temp->tr = block;
+            temp = temp->rt;
+        }
 
         top->width -= block->width;
         top->bl = block;
+        top->x = block->rightX();
         while(top->lb && top->lb->rightX() <= top->x)
             top->lb = top->lb->tr;
         r_top = top;
     }else{
         r_top = new Tile(top);
+        all.insert(r_top);
         _tile_num++;
         l_top = top;
         if(first)
             block->tr = r_top;
         if(!next)
-            block->bl = top;
+            block->bl = l_top;
 
         r_top->x = block->rightX();
         r_top->width = top->rightX()-block->rightX();
@@ -406,14 +452,7 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
 
         l_top->width = block->x - l_top->x;
         l_top->tr = block;
-        while(l_top->rt && l_top->rt->x >= l_top->rightX())
-            l_top->rt = l_top->rt->bl;
-    }
-    if(first){
-        if(l_top)
-            mergeSpace(l_top->rt,l_top);
-        if(r_top)
-            mergeSpace(r_top->rt,r_top);
+        l_top->rt = pre_l;
     }
     mergeSpace(pre_l, l_top);
     mergeSpace(pre_r, r_top);
@@ -421,17 +460,15 @@ void CornerStitching::insertTile(Tile* top, Tile* bottom, Tile* block, Tile* pre
 }
 
 bool CornerStitching::mergeSpace(Tile* pre, Tile* cur){
+    
     //preserve the current one if merge
     if(!pre || !cur)
         return false;
     if(pre->index!=-1 || cur->index!=-1){
-        //std::cerr<<"Error: unexpected block to merge."<<std::endl;
-        //exit(1);
         return false;
     }
     if(pre->y != cur->topY()){
-        std::cerr<<"Error: wrong sequence."<<std::endl;
-        exit(1);
+        return false;
     }
     if(pre->width==cur->width && pre->x == cur->x){
         cur->height += pre->height;
@@ -442,6 +479,7 @@ bool CornerStitching::mergeSpace(Tile* pre, Tile* cur){
         updateRightNeighbor(cur);
         updateTopNeighbor(cur);
 
+        all.erase(pre);
         delete pre;
         _tile_num--;
         return true;
@@ -453,8 +491,15 @@ bool CornerStitching::mergeSpace(Tile* pre, Tile* cur){
 
 inline void CornerStitching::updateLeftNeighbor(Tile* t, Tile* temp){
     //left
-    if(!temp)
+    if(!temp){
         temp = t->bl;
+        if(temp && (temp->rightX()!=t->x || temp->topY()<=t->y || temp->y > t->y)){
+            std::cerr<<"Error: found wrong pointer when update left."<<std::endl;
+            std::cerr<<t->x<<" "<<t->y<<" "<<t->rightX()<<" "<<t->topY()<<" "<<t->index<<std::endl;
+            std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+            exit(1);
+        }
+    }
     while(temp && temp->topY() <= t->topY()){
         temp->tr = t;
         temp = temp->rt;
@@ -464,8 +509,14 @@ inline void CornerStitching::updateLeftNeighbor(Tile* t, Tile* temp){
 
 inline void CornerStitching::updateRightNeighbor(Tile* t, Tile* temp){
     //right
-    if(!temp)
+    if(!temp){
         temp = t->tr;
+        if(temp && (temp->x!=t->rightX() || temp->topY()<t->topY() || temp->y >= t->topY())){
+            std::cerr<<"Error: found wrong pointer when update right."<<std::endl;
+            std::cerr<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+            exit(1);
+        }
+    }
     while(temp && temp->y >= t->y){
         temp->bl = t;
         temp = temp->lb;
@@ -474,8 +525,15 @@ inline void CornerStitching::updateRightNeighbor(Tile* t, Tile* temp){
 
 inline void CornerStitching::updateTopNeighbor(Tile* t, Tile* temp){
     //top
-    if(!temp)
+    if(!temp){
         temp = t->rt;
+        if(temp && (temp->y!=t->topY() || temp->x >= t->rightX() || temp->rightX() < t->rightX())){
+            std::cerr<<"Error: found wrong pointer when update top."<<std::endl;
+            std::cerr<<t->x<<" "<<t->y<<" "<<t->rightX()<<" "<<t->topY()<<" "<<t->index<<std::endl;
+            std::cerr<<temp->x<<" "<<temp->y<<" "<<temp->rightX()<<" "<<temp->topY()<<" "<<temp->index<<std::endl;
+            exit(1);
+        }
+    }
     while(temp && temp->x >= t->x){
         temp->lb = t;
         temp = temp->bl;
@@ -485,18 +543,18 @@ inline void CornerStitching::updateTopNeighbor(Tile* t, Tile* temp){
 
 inline void CornerStitching::updateBottomNeighbor(Tile* t, Tile* temp){
     //bottom
-    if(!temp)
+    if(!temp){
         temp = t->lb;
+        if(temp && (temp->topY()!=t->y || temp->rightX() <= t->x || temp->x > t->x)){
+            std::cerr<<"Error: found wrong pointer when update bottom."<<std::endl;
+            std::cerr<<t->x<<" "<<t->y<<" "<<t->width<<" "<<t->height<<" "<<t->index<<std::endl;
+            exit(1);
+        }
+    }
     while(temp && temp->rightX() <= t->rightX()){
         temp->rt = t;
         temp = temp->tr;
     }
 }
 
-void CornerStitching::updateAllNeighbor(Tile* t){
-    //make sure that four pointers of t is correct
-    updateLeftNeighbor(t);
-    updateRightNeighbor(t);
-    updateTopNeighbor(t);
-    updateBottomNeighbor(t);
-}
+
