@@ -44,12 +44,11 @@ void FM::readInput(const std::string & file_name){
             line.push_back(' ');
         size_t pos = 0;
         size_t pre_pos = 0;
-        std::set<int>cells;
+        std::set<Cell*>cells;
         Net *n = new Net(net_id);
         while((pos = line.find(" ",pre_pos))!=std::string::npos){
             std::string substr = line.substr(pre_pos,pos-pre_pos);
             int cell_id = std::stoi(substr);
-            cells.insert(cell_id);
             Cell* c;
             auto cell_iter = all_cells.find(cell_id);
             if(cell_iter==all_cells.end()){
@@ -59,6 +58,7 @@ void FM::readInput(const std::string & file_name){
             }else{
                 c = cell_iter->second;
             }
+            cells.insert(c);
             c->nets.insert(net_id);
             if(c->left){
                 n->l_cells++;
@@ -86,8 +86,8 @@ void FM::readInput(const std::string & file_name){
     }
     for(Net *n : all_nets){
         std::cout<<"Net "<<n->net_id<<" :";
-        for(int i: n->cells){
-            std::cout<<i<<" ";
+        for(Cell* c: n->cells){
+            std::cout<<c->cell_id<<" ";
         }
         std::cout<<std::endl;
         std::cout<<"left number:"<<n->l_cells<<std::endl;
@@ -129,7 +129,21 @@ void FM::writeOutput(const std::string & file_name){
     }
     fout.close();
 }
-void FM::initialGain(){}
+void FM::initialGain(){
+    for(size_t i=0;i<all_nets.size();++i){
+        Net *n = all_nets[i];
+        if(n->l_cells == 0){
+            for(Cell* c: n->cells){
+                c->gain--;
+#ifdef DEBUG
+                if(!c->left){
+                    throw std::runtime_error("Error: cell in the wrong group.");
+                }
+#endif
+            }
+        }       
+    }
+}
 void FM::updateGain(Cell* c){}
 Cell* FM::chooseCell(){
     return NULL;
