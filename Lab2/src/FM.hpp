@@ -1,10 +1,12 @@
 #ifndef FM_HPP 
 #define FM_HPP
+#define DEBUG
 
 #include <vector>
 #include <unordered_map>
 #include <list>
 #include <fstream>
+#include <algorithm>
 #include <iostream>
 #include "data_struct.hpp"
 
@@ -20,7 +22,7 @@ public:
     
     void readInput(const std::string & file_name);
     void writeOutput(const std::string & file_name);
-    void initialPartition();//distribute cells into two groups and set the initial F T values
+    void initialGain();//distribute cells into two groups and set the initial F T values
     void updateGain(Cell* c);//update net gain & cell gain
     Cell* chooseCell();//choose the valid candidate with largest gain 
     bool checkBalance(Cell* c);//check the balance when we want to move c to another group
@@ -28,21 +30,21 @@ public:
     Cell* findTarget(const int net_id, const bool side);//find the target cell in the specified net (for the case that T(N)=1 or F(N)=1)
     void storeResult();
     
-    int cell_num;
-    int net_num;
+    size_t cell_num;
+    size_t net_num;
     int min_group;
     int max_group;
     std::vector<Net*>all_nets;
     std::unordered_map<int, Cell*>all_cells;
-    Record best_record;
+    Record *best_record;
     
 private:
     std::vector<std::list<Cell*>>_l_group;
     std::vector<std::list<Cell*>>_r_group;
     std::vector<Record>recorder;
-    int _left_num;
-    int _right_num;
-    int _shift;// = Pmax (for the bucket )
+    size_t _left_num;
+    size_t _right_num;
+    size_t _shift;// = Pmax (for the bucket )
 };
 
 #endif

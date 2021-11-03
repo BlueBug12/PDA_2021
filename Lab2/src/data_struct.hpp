@@ -16,7 +16,7 @@ struct Net{
     ~Net() = default;
     
     
-    std::set<int>nodes;//or unordered_set
+    std::set<int>cells;//or unordered_set
     int net_id;
     int l_cells;
     int r_cells;
