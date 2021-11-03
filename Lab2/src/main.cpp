@@ -15,6 +15,8 @@ int main(int argc, char ** argv){
 
       float balance_ratio = 0.45;
       FM fm(argv[1], balance_ratio);
+      fm.initialGain();
+      fm.updateGain(fm.chooseCell());
       fm.writeOutput(out_name);
 
    return 0;

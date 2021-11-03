@@ -11,7 +11,7 @@ FM::FM(const std::string & file_name, float ratio){
     min_group = cell_num - max_group;
     _shift = 0;
     for(auto & pair: all_cells){
-        _shift = std::max(_shift,pair.second->nets.size());
+        _shift = std::max(_shift,(int)pair.second->nets.size());
     }
     _l_group.resize(2*_shift + 1);
     _r_group.resize(2*_shift + 1);
@@ -76,6 +76,11 @@ void FM::readInput(const std::string & file_name){
         n->cells = std::move(cells);
         all_nets.push_back(n);
     }
+
+    for(auto pair: all_cells)
+        ordered_cells.push_back({pair.second->cell_id,pair.second});
+    sort(ordered_cells.begin(),ordered_cells.end());
+
     fin.close();
 #ifdef DEBUG
     if(all_nets.size()!=net_num){
@@ -118,43 +123,273 @@ void FM::writeOutput(const std::string & file_name){
         std::cerr << "Error: can not open file "<< file_name << std::endl;
         exit(1);
     }
-    std::vector<std::pair<int,Cell*>>v;//first: index, second: Cell ptr
-    for(auto pair: all_cells)
-        v.push_back({pair.second->cell_id,pair.second});
 
-    sort(v.begin(),v.end());
-
-    for(size_t i =0;i<v.size();++i){
-        fout << v[i].second->left <<std::endl;
+    for(size_t i =0;i<ordered_cells.size();++i){
+        fout << ordered_cells[i].second->left <<std::endl;
     }
     fout.close();
 }
+
 void FM::initialGain(){
     for(size_t i=0;i<all_nets.size();++i){
         Net *n = all_nets[i];
+        //all cells locate at right / left group
         if(n->l_cells == 0){
+            for(Cell *c: n->cells){
+                c->gain--;
+#ifdef DEBUG
+                if(c->left){
+                    throw std::runtime_error("Error: cell in the wrong group(1).");
+                }
+#endif
+            }
+        }else if(n->r_cells == 0){
             for(Cell* c: n->cells){
                 c->gain--;
 #ifdef DEBUG
                 if(!c->left){
-                    throw std::runtime_error("Error: cell in the wrong group.");
+                    throw std::runtime_error("Error: cell in the wrong group(2).");
                 }
 #endif
             }
+        }else{//at least one cell locate at both sides
+            if(n->l_cells == 1){
+                Cell *c = findTarget(n->net_id, true);//left side == true
+                c->gain++;
+            }
+            if(n->r_cells == 1){
+                Cell *c = findTarget(n->net_id, false);//left side == true
+                c->gain++;
+            }
         }       
     }
+    best_record = new Record(getCutSize());
+
+    //set the initial bucket list
+    for(size_t i=0;i<ordered_cells.size();++i){
+        Cell *c = ordered_cells.at(i).second;
+        int index = c->gain+_shift;
+#ifdef DEBUG
+        if(index<0 || index>=(int)ordered_cells.size()){
+            throw std::runtime_error("Error: wrong shifted index.");
+        }
+#endif
+        if(c->left){
+            _l_group.at(index).push_back(c);
+        }else{
+            _r_group.at(index).push_back(c);
+        }
+    }
+
+#ifdef DEBUG
+    std::cout<<"After gain initialization:"<<std::endl;
+    for(auto pair: all_cells){
+        int index = pair.first;
+        Cell *c = pair.second;
+        std::cout<<"Initial gain of Cell "<<index<<":"<<c->gain<<std::endl;
+    }
+
+    std::cout<<"Initial bucket list:"<<std::endl;
+    std::cout<<"Left list:"<<std::endl;
+    for(int i=0;i<(int)_l_group.size();++i){
+        std::cout<<i-_shift<<"->";
+        for(auto it = _l_group.at(i).begin();it!=_l_group.at(i).end();++it){
+            std::cout<<(*it)->cell_id<<" ";
+        }
+        std::cout<<std::endl;
+    }
+    std::cout<<"Right list:"<<std::endl;
+    for(int i=0;i<(int)_r_group.size();++i){
+        std::cout<<i-_shift<<"->";
+        for(auto it = _r_group.at(i).begin();it!=_r_group.at(i).end();++it){
+            std::cout<<(*it)->cell_id<<" ";
+        }
+        std::cout<<std::endl;
+    }
+#endif 
 }
-void FM::updateGain(Cell* c){}
+void FM::updateGain(Cell* c){
+    //in this function, we don't care whether or not the cell is lock
+    c->lock = true;
+    std::unordered_map<Cell *, int> table;//record the origin gain of modified cell
+    if(c->left){//move cell from left to right
+        _left_num--;
+        _right_num++;
+        for(size_t i = 0;i<all_nets.size();++i){
+            Net *n = all_nets.at(i);
+            if(n->r_cells == 0){//To
+                for(Cell* c: n->cells){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain++;
+    #ifdef DEBUG
+                    if(!c->left){
+                        throw std::runtime_error("Error: cell in the wrong group(3).");
+                    }
+    #endif
+                }
+            }else if(n->r_cells == 1){
+                Cell *c = findTarget(n->net_id,false);
+                if(table.find(c)==table.end()){
+                    table.insert({c,c->gain});
+                }
+                c->gain--;
+            }
+
+            n->l_cells--;
+            _left_num--;
+            n->r_cells++;
+            _right_num++;
+
+            c->left = false;
+
+            if(n->l_cells == 0){
+                for(Cell* c: n->cells){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain--;
+                }
+            }else if(n->l_cells == 1){
+                Cell* c = findTarget(n->net_id,true);
+                if(table.find(c)==table.end()){
+                    table.insert({c,c->gain});
+                }
+                c->gain++;
+            }
+        }
+    }else{//move cell from right to left
+        _left_num++;
+        _right_num--;
+        for(size_t i = 0;i<all_nets.size();++i){
+            Net *n = all_nets.at(i);
+            if(n->l_cells == 0){//To
+                for(Cell* c: n->cells){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain++;
+    #ifdef DEBUG
+                    if(c->left){
+                        throw std::runtime_error("Error: cell in the wrong group(4).");
+                    }
+    #endif
+                }
+            }else if(n->l_cells == 1){
+                Cell *c = findTarget(n->net_id,true);
+                if(table.find(c)==table.end()){
+                   table.insert({c,c->gain});
+                }
+                c->gain--;
+            }
+
+            n->r_cells--;
+            _right_num--;
+            n->l_cells++;
+            _left_num++;
+
+            c->left = true;
+
+            if(n->r_cells == 0){
+                for(Cell* c: n->cells){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain--;
+                }
+            }else if(n->r_cells == 1){
+                Cell *c = findTarget(n->net_id,false);
+                if(table.find(c)==table.end()){
+                    table.insert({c,c->gain});
+                }
+                c->gain++;
+            }
+        }
+    }
+
+    //update bucket list
+    for(auto pair: table){
+        Cell *c = pair.first;
+        int index = pair.second + _shift;
+        std::vector<std::list<Cell*>> *group;
+        if(c->left){
+            group = &_l_group;
+        }else{
+            group = &_r_group;
+        }
+        std::list<Cell*>& bucket = group->at(index);
+
+        for(auto iter = bucket.begin();iter!=bucket.end();++iter){
+            if(*iter == c){
+                bucket.erase(iter);
+                group->at(c->gain + _shift).push_back(c);
+                break;
+            }
+        }
+    }
+    
+
+}
 Cell* FM::chooseCell(){
-    return NULL;
+    bool move_left = true;
+    bool move_right = true;
+    if(_left_num - 1 < min_group)
+        move_right = false;
+    if(_right_num - 1 < min_group)
+        move_left = false;
+    //find the unlock cell with greatest gain without viloating balance
+    for(int i = (int)_l_group.size()-1;i>=0;--i){
+        if(move_right && !_l_group.at(i).empty()){
+            for(auto iter = _l_group.at(i).begin();iter!=_l_group.at(i).end();++iter){
+                if(!(*iter)->lock){
+                    Cell *c = (*iter);
+                    _l_group.at(i).erase(iter);
+                    return c;
+                }
+            }
+        }
+        if(move_left && !_r_group.at(i).empty()){
+            for(auto iter = _r_group.at(i).begin();iter!=_r_group.at(i).end();++iter){
+                if(!(*iter)->lock){
+                    Cell *c = (*iter);
+                    _r_group.at(i).erase(iter);
+                    return c;
+                }
+            }
+        }
+    }
+    throw std::runtime_error("Error: can not find unlock cell in the list.");
 } 
-bool FM::checkBalance(Cell* c){
+inline bool FM::checkBalance(Cell* c){
+    if(c->left && _left_num - 1 < min_group){
+        return false;
+    }
+    if(!c->left && _right_num - 1 < min_group){
+        return false;
+    }
     return true;
 }
 void FM::unlockAll(){}
-Cell* FM::findTarget(const int net_id, const bool side){
-    return NULL;
+Cell* FM::findTarget(const int net_id, const bool left){
+    std::set<Cell*>& c_set = all_nets.at(net_id)->cells;
+    for(Cell* c: c_set){
+        if(c->left == left){
+            return c;
+        }
+    }
+    throw std::runtime_error("Error: can not find target cell in net.");
 }
 void FM::storeResult(){
     return;    
+}
+
+inline int FM::getCutSize(){
+    int cut_size = 0;
+    for(Net *n:all_nets){
+        if(n->l_cells !=0 && n->r_cells !=0){//exist cross edge
+            ++cut_size;
+        }
+    }
+    return cut_size;
 }

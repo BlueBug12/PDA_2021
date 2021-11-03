@@ -44,6 +44,11 @@ struct Net{
 
 struct Record{
     Record(Cell* c, int sum, int cut):moved_cell(c), best_gain(c->gain),gain_sum(sum), cut_size(cut){}
+    Record(int cut):cut_size(cut){
+        moved_cell = NULL;
+        best_gain = 0;
+        gain_sum = 0;
+    }
     Record() = delete;
     Record(Record const &) = default;
     Record(Record      &&) = default;
