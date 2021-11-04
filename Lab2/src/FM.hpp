@@ -23,7 +23,7 @@ public:
     
     void readInput(const std::string & file_name);
     void writeOutput(const std::string & file_name);
-    void initialGain();//distribute cells into two groups and set the initial F T values
+    void initialize();//distribute cells into two groups and set the initial F T values
     void updateGain(Cell* target);//update net gain & cell gain
     Cell* chooseCell();//choose the valid candidate with largest gain 
     inline bool checkBalance(Cell* c);//check the balance when we want to move c to another group
@@ -31,6 +31,7 @@ public:
     Cell* findTarget(const int net_id, const bool left);//find the target cell in the specified net (for the case that T(N)=1 or F(N)=1)
     void storeResult();
     inline int getCutSize();
+    void resetGain();
     
     size_t cell_num;
     size_t net_num;

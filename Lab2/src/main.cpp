@@ -16,7 +16,7 @@ int main(int argc, char ** argv){
     float balance_ratio = 0.45;
     int counter = 1;
     FM fm(argv[1], balance_ratio);
-    fm.initialGain();
+    fm.initialize();
     while(!fm.stop){
         std::cout<<"Start round "<<counter++<<std::endl;
         for(size_t i=0;i<fm.cell_num;++i){
@@ -25,6 +25,7 @@ int main(int argc, char ** argv){
         }
         fm.storeResult();
         fm.unlockAll();
+        fm.initialize();
     }
     fm.writeOutput(out_name);
 

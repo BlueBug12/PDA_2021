@@ -1,6 +1,8 @@
 #include "FM.hpp"
 
 FM::FM(const std::string & file_name, float ratio){
+    _left_num = 0;
+    _right_num = 0;
     stop = false;
     best_record = NULL;
     readInput(file_name);
@@ -45,7 +47,6 @@ void FM::readInput(const std::string & file_name){
             line.push_back(' ');
         size_t pos = 0;
         size_t pre_pos = 0;
-        std::set<Cell*>cells;
         Net *n = new Net(net_id);
         while((pos = line.find(" ",pre_pos))!=std::string::npos){
             std::string substr = line.substr(pre_pos,pos-pre_pos);
@@ -59,8 +60,10 @@ void FM::readInput(const std::string & file_name){
             }else{
                 c = cell_iter->second;
             }
-            cells.insert(c);
-            c->nets.insert(net_id);
+
+            n->cells.push_back(c);
+            c->nets.push_back(n);
+
             if(c->left){
                 n->l_cells++;
                 _left_num++;
@@ -74,7 +77,6 @@ void FM::readInput(const std::string & file_name){
             
         }
         net_id++;
-        n->cells = std::move(cells);
         all_nets.push_back(n);
     }
 
@@ -90,6 +92,7 @@ void FM::readInput(const std::string & file_name){
     if(all_cells.size()!=cell_num){
         throw std::runtime_error("Error: cell number unmatched");
     }
+    /*
     for(Net *n : all_nets){
         std::cout<<"Net "<<n->net_id<<" :";
         for(Cell* c: n->cells){
@@ -104,8 +107,8 @@ void FM::readInput(const std::string & file_name){
     for(auto pair: all_cells){
         Cell* c = pair.second;
         std::cout<<"Cell "<<c->cell_id<<" :";
-        for(int i : c->nets){
-            std::cout<<i<<" ";
+        for(Net *n : c->nets){
+            std::cout<<n->net_id<<" ";
         }
         std::cout<<std::endl;
         if(c->left)
@@ -113,7 +116,7 @@ void FM::readInput(const std::string & file_name){
         else
             std::cout<<"right"<<std::endl;
         std::cout<<std::endl;
-    }    
+    }*/    
     
 #endif
 }
@@ -131,7 +134,9 @@ void FM::writeOutput(const std::string & file_name){
     fout.close();
 }
 
-void FM::initialGain(){
+void FM::resetGain(){
+    for(auto pair: all_cells)
+        pair.second->gain = 0;
     for(size_t i=0;i<all_nets.size();++i){
         Net *n = all_nets[i];
         //all cells locate at right / left group
@@ -164,15 +169,25 @@ void FM::initialGain(){
             }
         }       
     }
-    best_record = new Record(getCutSize(),std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
-    recorder.push_back(*best_record);
+}
+
+void FM::initialize(){
+    resetGain();
+    Record initial_r(getCutSize(),std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
+    std::cout<<"cut size:"<<initial_r.cut_size<<std::endl;
+    if(!best_record)
+        best_record = new Record(initial_r);
+    recorder.push_back(std::move(initial_r));
 
     //set the initial bucket list
     for(size_t i=0;i<ordered_cells.size();++i){
         Cell *c = ordered_cells.at(i).second;
         int index = c->gain+_shift;
 #ifdef DEBUG
-        if(index<0 || index>=(int)ordered_cells.size()){
+        if(index<0 || index>=(int)_l_group.size()){
+            std::cout<<"gain:"<<c->gain<<std::endl;
+            std::cout<<"shift:"<<_shift<<std::endl;
+            std::cout<<_l_group.size()<<std::endl;
             throw std::runtime_error("Error: wrong shifted index.");
         }
 #endif
@@ -182,8 +197,8 @@ void FM::initialGain(){
             _r_group.at(index).push_back(c);
         }
     }
-
 #ifdef DEBUG
+    /*
     std::cout<<"After gain initialization:"<<std::endl;
     for(auto pair: all_cells){
         int index = pair.first;
@@ -207,7 +222,7 @@ void FM::initialGain(){
             std::cout<<(*it)->cell_id<<" ";
         }
         std::cout<<std::endl;
-    }
+    }*/
 #endif 
 }
 void FM::updateGain(Cell* target){
@@ -218,37 +233,42 @@ void FM::updateGain(Cell* target){
     if(target->left){//move cell from left to right
         _left_num--;
         _right_num++;
-        for(size_t i = 0;i<all_nets.size();++i){
-            Net *n = all_nets.at(i);
+        target->left = false;
+        //std::cout<<"Move cell "<< target->cell_id<<" from left to right."<<std::endl;
+        for(Net* n: target->nets){
+            //std::cout<<"update net "<<n->net_id<<std::endl;
             if(n->r_cells == 0){//To
                 for(Cell* c: n->cells){
+                    if(c->lock)
+                        continue;
                     if(table.find(c)==table.end()){
                         table.insert({c,c->gain});
                     }
                     c->gain++;
     #ifdef DEBUG
                     if(!c->left){
+                        std::cerr<<"found cell "<<c->cell_id<<std::endl;
                         throw std::runtime_error("Error: cell in the wrong group(3).");
                     }
     #endif
                 }
             }else if(n->r_cells == 1){
                 Cell *c = findTarget(n->net_id,false);
-                if(table.find(c)==table.end()){
-                    table.insert({c,c->gain});
+                if(c){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain--;
                 }
-                c->gain--;
             }
 
             n->l_cells--;
-            _left_num--;
             n->r_cells++;
-            _right_num++;
 
-            target->left = false;
-
-            if(n->l_cells == 0){
+            if(n->l_cells == 0){//From
                 for(Cell* c: n->cells){
+                    if(c->lock)
+                        continue;
                     if(table.find(c)==table.end()){
                         table.insert({c,c->gain});
                     }
@@ -256,19 +276,42 @@ void FM::updateGain(Cell* target){
                 }
             }else if(n->l_cells == 1){
                 Cell* c = findTarget(n->net_id,true);
-                if(table.find(c)==table.end()){
-                    table.insert({c,c->gain});
+                if(c){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain++;
                 }
-                c->gain++;
             }
+#ifdef DEBUG
+            if((int)n->cells.size()!=n->l_cells+n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(4).");
+            int l_c = 0;
+            int r_c = 0;
+            for(Cell* c: n->cells){
+                if(c->left)
+                    ++l_c;
+                else
+                    ++r_c;
+            }
+            if(l_c!=n->l_cells)
+                throw std::runtime_error("Error: cell size unmatched(5).");
+
+            if(r_c!=n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(6).");
+#endif
         }
     }else{//move cell from right to left
-        _left_num++;
         _right_num--;
-        for(size_t i = 0;i<all_nets.size();++i){
-            Net *n = all_nets.at(i);
+        _left_num++;
+        target->left = true;
+        //std::cout<<"Move cell "<< target->cell_id<<" from right to left."<<std::endl;
+        for(Net *n: target->nets){
+            //std::cout<<"update net "<<n->net_id<<std::endl;
             if(n->l_cells == 0){//To
                 for(Cell* c: n->cells){
+                    if(c->lock)
+                        continue;
                     if(table.find(c)==table.end()){
                         table.insert({c,c->gain});
                     }
@@ -281,21 +324,22 @@ void FM::updateGain(Cell* target){
                 }
             }else if(n->l_cells == 1){
                 Cell *c = findTarget(n->net_id,true);
-                if(table.find(c)==table.end()){
-                   table.insert({c,c->gain});
+                if(c){
+                    if(table.find(c)==table.end()){
+                       table.insert({c,c->gain});
+                    }
+                    c->gain--;
                 }
-                c->gain--;
             }
 
             n->r_cells--;
-            _right_num--;
             n->l_cells++;
-            _left_num++;
 
-            target->left = true;
 
-            if(n->r_cells == 0){
+            if(n->r_cells == 0){//from
                 for(Cell* c: n->cells){
+                    if(c->lock)
+                        continue;
                     if(table.find(c)==table.end()){
                         table.insert({c,c->gain});
                     }
@@ -303,11 +347,31 @@ void FM::updateGain(Cell* target){
                 }
             }else if(n->r_cells == 1){
                 Cell *c = findTarget(n->net_id,false);
-                if(table.find(c)==table.end()){
-                    table.insert({c,c->gain});
+                if(c){
+                    if(table.find(c)==table.end()){
+                        table.insert({c,c->gain});
+                    }
+                    c->gain++;
                 }
-                c->gain++;
             }
+         
+#ifdef DEBUG
+            if((int)n->cells.size()!=n->l_cells+n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(1).");
+            int l_c = 0;
+            int r_c = 0;
+            for(Cell* c: n->cells){
+                if(c->left)
+                    ++l_c;
+                else
+                    ++r_c;
+            }
+            if(l_c!=n->l_cells)
+                throw std::runtime_error("Error: cell size unmatched(2).");
+
+            if(r_c!=n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(3).");
+#endif
         }
     }
 
@@ -326,6 +390,10 @@ void FM::updateGain(Cell* target){
         for(auto iter = bucket.begin();iter!=bucket.end();++iter){
             if(*iter == c){
                 bucket.erase(iter);
+#ifdef DEBUG
+                if(c->gain + _shift>=(int)group->size()||c->gain + _shift<0)
+                    throw std::runtime_error("Error: index out of range when update bucket.");
+#endif
                 group->at(c->gain + _shift).push_back(c);
                 break;
             }
@@ -366,7 +434,18 @@ Cell* FM::chooseCell(){
             }
         }
     }
+#ifdef DEBUG
+    size_t l = 0;
+    for(auto pair: all_cells){
+        Cell *c = pair.second;
+        if(c->lock)
+            ++l;
+    }
+    std::cerr<<"luck: "<<l<<"  unlock: "<<all_nets.size()-l<<std::endl;
+    std::cerr<<"move right "<<move_right<<std::endl;
+    std::cerr<<"move lefti "<<move_left<<std::endl;
     throw std::runtime_error("Error: can not find unlock cell in the list.");
+#endif
 } 
 inline bool FM::checkBalance(Cell* c){
     if(c->left && _left_num - 1 < min_group){
@@ -390,13 +469,13 @@ void FM::unlockAll(){
 }
 
 Cell* FM::findTarget(const int net_id, const bool left){
-    std::set<Cell*>& c_set = all_nets.at(net_id)->cells;
+    std::vector<Cell*>& c_set = all_nets.at(net_id)->cells;
     for(Cell* c: c_set){
-        if(c->left == left){
+        if(c->left == left && !c->lock){
             return c;
         }
     }
-    throw std::runtime_error("Error: can not find target cell in net.");
+    return NULL;
 }
 
 void FM::storeResult(){
@@ -418,13 +497,16 @@ void FM::storeResult(){
         return;
 
     //reset the solution 
-    for(int i=0;i<=index;++i){
+    int i = 0;
+    if(!recorder.front().moved_cell)
+        i = 1;
+    for(;i<=index;++i){
        Record & r = recorder.at(i);
        Cell* c = r.moved_cell;
        c->ret_left = !c->init_left;
     }
     delete best_record;
-    *best_record = recorder.at(index);
+    best_record = new Record(recorder.at(index));
     recorder.clear();
 }
 

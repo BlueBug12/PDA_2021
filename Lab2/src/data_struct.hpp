@@ -1,8 +1,8 @@
 #ifndef DATA_STRUCT_HPP 
 #define DATA_STRUCT_HPP
 
-#include <set>
-
+#include <vector>
+struct Net;
 struct Cell{
     Cell(int id, bool l): cell_id(id),left(l){
         init_left = left;
@@ -17,7 +17,7 @@ struct Cell{
     Cell & operator=(Cell      &&) = default;
     ~Cell() = default;
     
-    std::set<int>nets;//store net id
+    std::vector<Net*>nets;//store net id
     int cell_id;
     bool lock;
     bool left;//represent current group
@@ -39,7 +39,7 @@ struct Net{
     ~Net() = default;
     
     
-    std::set<Cell*>cells;//or unordered_set
+    std::vector<Cell*>cells;//or unordered_set
     int net_id;
     int l_cells;
     int r_cells;
