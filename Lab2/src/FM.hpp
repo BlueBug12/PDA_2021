@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <climits>
 #include <list>
 #include <fstream>
 #include <algorithm>
@@ -23,7 +24,7 @@ public:
     void readInput(const std::string & file_name);
     void writeOutput(const std::string & file_name);
     void initialGain();//distribute cells into two groups and set the initial F T values
-    void updateGain(Cell* c);//update net gain & cell gain
+    void updateGain(Cell* target);//update net gain & cell gain
     Cell* chooseCell();//choose the valid candidate with largest gain 
     inline bool checkBalance(Cell* c);//check the balance when we want to move c to another group
     void unlockAll();
@@ -39,6 +40,7 @@ public:
     std::unordered_map<int, Cell*>all_cells;
     std::vector<std::pair<int,Cell*>>ordered_cells;
     Record *best_record;
+    bool stop;
     
 private:
     std::vector<std::list<Cell*>>_l_group;

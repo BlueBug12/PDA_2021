@@ -1,6 +1,7 @@
 #include "FM.hpp"
 
 FM::FM(const std::string & file_name, float ratio){
+    stop = false;
     best_record = NULL;
     readInput(file_name);
     if(ratio>=0.5){
@@ -125,7 +126,7 @@ void FM::writeOutput(const std::string & file_name){
     }
 
     for(size_t i =0;i<ordered_cells.size();++i){
-        fout << ordered_cells[i].second->left <<std::endl;
+        fout << ordered_cells[i].second->ret_left <<std::endl;
     }
     fout.close();
 }
@@ -163,7 +164,8 @@ void FM::initialGain(){
             }
         }       
     }
-    best_record = new Record(getCutSize());
+    best_record = new Record(getCutSize(),std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
+    recorder.push_back(*best_record);
 
     //set the initial bucket list
     for(size_t i=0;i<ordered_cells.size();++i){
@@ -208,11 +210,12 @@ void FM::initialGain(){
     }
 #endif 
 }
-void FM::updateGain(Cell* c){
+void FM::updateGain(Cell* target){
     //in this function, we don't care whether or not the cell is lock
-    c->lock = true;
+    target->lock = true;
+    int origin_gain = target->gain;
     std::unordered_map<Cell *, int> table;//record the origin gain of modified cell
-    if(c->left){//move cell from left to right
+    if(target->left){//move cell from left to right
         _left_num--;
         _right_num++;
         for(size_t i = 0;i<all_nets.size();++i){
@@ -242,7 +245,7 @@ void FM::updateGain(Cell* c){
             n->r_cells++;
             _right_num++;
 
-            c->left = false;
+            target->left = false;
 
             if(n->l_cells == 0){
                 for(Cell* c: n->cells){
@@ -289,7 +292,7 @@ void FM::updateGain(Cell* c){
             n->l_cells++;
             _left_num++;
 
-            c->left = true;
+            target->left = true;
 
             if(n->r_cells == 0){
                 for(Cell* c: n->cells){
@@ -328,8 +331,12 @@ void FM::updateGain(Cell* c){
             }
         }
     }
-    
-
+    Record r(target,
+            origin_gain,
+            origin_gain+recorder.back().gain_sum,
+            getCutSize(),
+            std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
+    recorder.push_back(std::move(r));
 }
 Cell* FM::chooseCell(){
     bool move_left = true;
@@ -370,7 +377,18 @@ inline bool FM::checkBalance(Cell* c){
     }
     return true;
 }
-void FM::unlockAll(){}
+void FM::unlockAll(){
+    for(size_t i=0;i<ordered_cells.size();++i){
+        Cell *c = ordered_cells.at(i).second;
+    #ifdef DEBUG
+        if(!c->lock)
+            throw std::runtime_error("Error: exist unlock cell after one pass.");
+    #endif
+        c->lock = false;
+        c->init_left = c->left;
+    }
+}
+
 Cell* FM::findTarget(const int net_id, const bool left){
     std::set<Cell*>& c_set = all_nets.at(net_id)->cells;
     for(Cell* c: c_set){
@@ -380,8 +398,34 @@ Cell* FM::findTarget(const int net_id, const bool left){
     }
     throw std::runtime_error("Error: can not find target cell in net.");
 }
+
 void FM::storeResult(){
-    return;    
+    stop = true;
+    float min_cut = best_record->cut_size;
+    float best_balance = best_record->balance_ratio;
+    int index = -1;
+    for(size_t i=0;i<recorder.size();++i){
+        Record & r = recorder.at(i);
+        if(min_cut > r.cut_size || (min_cut == r.cut_size && r.balance_ratio > best_balance)){
+            index = (int)i;
+            best_balance = r.balance_ratio;
+            min_cut = r.cut_size;
+        }
+        if(r.gain_sum>0)
+            stop = false;
+    }
+    if(index == -1)
+        return;
+
+    //reset the solution 
+    for(int i=0;i<=index;++i){
+       Record & r = recorder.at(i);
+       Cell* c = r.moved_cell;
+       c->ret_left = !c->init_left;
+    }
+    delete best_record;
+    *best_record = recorder.at(index);
+    recorder.clear();
 }
 
 inline int FM::getCutSize(){

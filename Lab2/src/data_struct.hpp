@@ -5,6 +5,8 @@
 
 struct Cell{
     Cell(int id, bool l): cell_id(id),left(l){
+        init_left = left;
+        ret_left = left;
         lock = false;
         gain = 0;
     }
@@ -18,7 +20,9 @@ struct Cell{
     std::set<int>nets;//store net id
     int cell_id;
     bool lock;
-    bool left;
+    bool left;//represent current group
+    bool init_left;//set when each pass restart
+    bool ret_left;//represent solution
     int gain;
 };
 
@@ -43,8 +47,8 @@ struct Net{
 
 
 struct Record{
-    Record(Cell* c, int sum, int cut):moved_cell(c), best_gain(c->gain),gain_sum(sum), cut_size(cut){}
-    Record(int cut):cut_size(cut){
+    Record(Cell* c, int gain, int sum, int cut, float balance):moved_cell(c), best_gain(gain),gain_sum(sum), cut_size(cut), balance_ratio(balance){}
+    Record(int cut, float balance):cut_size(cut), balance_ratio(balance){
         moved_cell = NULL;
         best_gain = 0;
         gain_sum = 0;
@@ -60,6 +64,7 @@ struct Record{
     int best_gain;
     int gain_sum;
     int cut_size;
+    float balance_ratio;
 };
 
 #endif
