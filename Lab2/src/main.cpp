@@ -47,5 +47,10 @@ int main(int argc, char ** argv){
     fm.writeOutput(out_name);
     std::cout<<"writeOutput takes "<<double(clock()-temp)/CLOCKS_PER_SEC<<" s."<<std::endl;
     std::cout<<"Total takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s."<<std::endl;
+
+    std::cout<<fm.case1<<std::endl;
+    std::cout<<fm.case2<<std::endl;
+    std::cout<<fm.case3<<std::endl;
+    std::cout<<fm.case4<<std::endl;
    return 0;
 }

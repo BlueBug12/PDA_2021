@@ -45,7 +45,10 @@ public:
     bool stop;
     int min_cut;
     float best_balance;
-    
+    int case1;
+    int case2;
+    int case3;
+    int case4;
 private:
     std::vector<std::list<Cell*>>_l_group;
     std::vector<std::list<Cell*>>_r_group;

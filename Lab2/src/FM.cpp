@@ -1,6 +1,10 @@
 #include "FM.hpp"
 
 FM::FM(const std::string & file_name, float ratio){
+    case1 = 0;
+    case2 = 0;
+    case3 = 0;
+    case4 = 0;
     _left_num = 0;
     _right_num = 0;
     stop = false;
@@ -125,7 +129,7 @@ void FM::resetGain(){
         Net *n = all_nets[i];
         n->l_cells = n->init_l_cells;
         n->r_cells = n->init_r_cells;
-
+        
 #ifdef DEBUG
             if((int)n->cells.size()!=n->l_cells+n->r_cells)
                 throw std::runtime_error("Error: cell size unmatched(7).");
@@ -207,6 +211,7 @@ void FM::updateGain(Cell* target){
         target->left = false;
         for(Net* n: target->nets){
             if(n->r_cells == 0){//To
+                ++case1;
                 for(Cell* c: n->cells){
                     if(c->lock)
                         continue;
@@ -222,6 +227,8 @@ void FM::updateGain(Cell* target){
     #endif
                 }
             }else if(n->r_cells == 1){
+                ++case2;
+
                 Cell *c = findTarget(n->net_id,false);
                 if(c){
                     if(table.find(c)==table.end()){
@@ -235,6 +242,8 @@ void FM::updateGain(Cell* target){
             n->r_cells++;
 
             if(n->l_cells == 0){//From
+                ++case3;
+
                 for(Cell* c: n->cells){
                     if(c->lock)
                         continue;
@@ -244,6 +253,8 @@ void FM::updateGain(Cell* target){
                     c->gain--;
                 }
             }else if(n->l_cells == 1){
+                ++case4;
+
                 Cell* c = findTarget(n->net_id,true);
                 if(c){
                     if(table.find(c)==table.end()){
@@ -276,6 +287,8 @@ void FM::updateGain(Cell* target){
         target->left = true;
         for(Net *n: target->nets){
             if(n->l_cells == 0){//To
+                ++case1;
+
                 for(Cell* c: n->cells){
                     if(c->lock)
                         continue;
@@ -290,6 +303,8 @@ void FM::updateGain(Cell* target){
     #endif
                 }
             }else if(n->l_cells == 1){
+                ++case2;
+
                 Cell *c = findTarget(n->net_id,true);
                 if(c){
                     if(table.find(c)==table.end()){
@@ -304,6 +319,8 @@ void FM::updateGain(Cell* target){
 
 
             if(n->r_cells == 0){//from
+                ++case3;
+
                 for(Cell* c: n->cells){
                     if(c->lock)
                         continue;
@@ -313,6 +330,8 @@ void FM::updateGain(Cell* target){
                     c->gain--;
                 }
             }else if(n->r_cells == 1){
+                ++case4;
+
                 Cell *c = findTarget(n->net_id,false);
                 if(c){
                     if(table.find(c)==table.end()){
