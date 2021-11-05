@@ -7,8 +7,7 @@ FM::FM(const std::string & file_name, float ratio){
     readInput(file_name);
     min_cut = getCutSize();
     best_balance = std::min((float)_left_num/cell_num,(float)_right_num/cell_num);
-    std::cout<<cell_num<<" "<<_left_num<<" "<<_right_num<<std::endl; 
-    std::cout<<min_cut<<" "<<best_balance<<std::endl;
+
     if(ratio>=0.5){
         max_group = cell_num*ratio;
     }else{
@@ -23,10 +22,13 @@ FM::FM(const std::string & file_name, float ratio){
     }
     _l_group.resize(2*_shift + 1);
     _r_group.resize(2*_shift + 1);
-#ifdef DEBUG
+#ifdef PRINTER
+    std::cout<<std::endl; 
     std::cout<<"min group:"<<min_group<<std::endl;
     std::cout<<"max group:"<<max_group<<std::endl;
     std::cout<<"shift value:"<<_shift<<std::endl;
+    std::cout<<std::endl; 
+
 #endif
 }
 FM::~FM(){
@@ -100,32 +102,6 @@ void FM::readInput(const std::string & file_name){
     if(all_cells.size()!=cell_num){
         throw std::runtime_error("Error: cell number unmatched");
     }
-    /*
-    for(Net *n : all_nets){
-        std::cout<<"Net "<<n->net_id<<" :";
-        for(Cell* c: n->cells){
-            std::cout<<c->cell_id<<" ";
-        }
-        std::cout<<std::endl;
-        std::cout<<"left number:"<<n->l_cells<<std::endl;
-        std::cout<<"right number:"<<n->r_cells<<std::endl;
-        std::cout<<std::endl;
-    }
-
-    for(auto pair: all_cells){
-        Cell* c = pair.second;
-        std::cout<<"Cell "<<c->cell_id<<" :";
-        for(Net *n : c->nets){
-            std::cout<<n->net_id<<" ";
-        }
-        std::cout<<std::endl;
-        if(c->left)
-            std::cout<<"left"<<std::endl;
-        else
-            std::cout<<"right"<<std::endl;
-        std::cout<<std::endl;
-    }*/    
-    
 #endif
 }
 
@@ -210,9 +186,6 @@ void FM::initialize(){
         int index = c->gain+_shift;
 #ifdef DEBUG
         if(index<0 || index>=(int)_l_group.size()){
-            std::cout<<"gain:"<<c->gain<<std::endl;
-            std::cout<<"shift:"<<_shift<<std::endl;
-            std::cout<<_l_group.size()<<std::endl;
             throw std::runtime_error("Error: wrong shifted index.");
         }
 #endif
@@ -222,33 +195,6 @@ void FM::initialize(){
             _r_group.at(index).push_back(c);
         }
     }
-#ifdef DEBUG
-    /*
-    std::cout<<"After gain initialization:"<<std::endl;
-    for(auto pair: all_cells){
-        int index = pair.first;
-        Cell *c = pair.second;
-        std::cout<<"Initial gain of Cell "<<index<<":"<<c->gain<<std::endl;
-    }
-
-    std::cout<<"Initial bucket list:"<<std::endl;
-    std::cout<<"Left list:"<<std::endl;
-    for(int i=0;i<(int)_l_group.size();++i){
-        std::cout<<i-_shift<<"->";
-        for(auto it = _l_group.at(i).begin();it!=_l_group.at(i).end();++it){
-            std::cout<<(*it)->cell_id<<" ";
-        }
-        std::cout<<std::endl;
-    }
-    std::cout<<"Right list:"<<std::endl;
-    for(int i=0;i<(int)_r_group.size();++i){
-        std::cout<<i-_shift<<"->";
-        for(auto it = _r_group.at(i).begin();it!=_r_group.at(i).end();++it){
-            std::cout<<(*it)->cell_id<<" ";
-        }
-        std::cout<<std::endl;
-    }*/
-#endif 
 }
 void FM::updateGain(Cell* target){
     //in this function, we don't care whether or not the cell is lock
@@ -259,9 +205,7 @@ void FM::updateGain(Cell* target){
         _left_num--;
         _right_num++;
         target->left = false;
-        //std::cout<<"Move cell "<< target->cell_id<<" from left to right."<<std::endl;
         for(Net* n: target->nets){
-            //std::cout<<"update net "<<n->net_id<<std::endl;
             if(n->r_cells == 0){//To
                 for(Cell* c: n->cells){
                     if(c->lock)
@@ -330,9 +274,7 @@ void FM::updateGain(Cell* target){
         _right_num--;
         _left_num++;
         target->left = true;
-        //std::cout<<"Move cell "<< target->cell_id<<" from right to left."<<std::endl;
         for(Net *n: target->nets){
-            //std::cout<<"update net "<<n->net_id<<std::endl;
             if(n->l_cells == 0){//To
                 for(Cell* c: n->cells){
                     if(c->lock)
@@ -539,7 +481,7 @@ void FM::storeResult(){
         best_balance = best_balance_local;
     }
         flag = true;
-#ifdef DEBUG
+#ifdef PRINTER
     std::cout<<"Result in this round:"<<std::endl;
     std::cout<<"min cut size:"<<min_cut_local<<std::endl;
     std::cout<<"best balance ratio:"<<best_balance_local<<std::endl;

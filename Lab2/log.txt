@@ -1,0 +1,6 @@
+case1:
+    0 s
+case2:
+    0.25 s
+case3:
+    250 s(for one pass)

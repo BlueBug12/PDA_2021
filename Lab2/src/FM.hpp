@@ -1,6 +1,7 @@
 #ifndef FM_HPP 
 #define FM_HPP
 //#define DEBUG
+//#define PRINTER 
 
 #include <vector>
 #include <unordered_map>
