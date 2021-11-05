@@ -1,6 +1,6 @@
 #ifndef FM_HPP 
 #define FM_HPP
-#define DEBUG
+//#define DEBUG
 
 #include <vector>
 #include <unordered_map>
@@ -9,6 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include <iostream>
+#include <ctime>
 #include "data_struct.hpp"
 
 class FM{

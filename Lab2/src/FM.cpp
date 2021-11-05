@@ -474,6 +474,7 @@ Cell* FM::chooseCell(){
     std::cerr<<"move lefti "<<move_left<<std::endl;
     throw std::runtime_error("Error: can not find unlock cell in the list.");
 #endif
+    return NULL;
 } 
 inline bool FM::checkBalance(Cell* c){
     if(c->left && _left_num - 1 < min_group){

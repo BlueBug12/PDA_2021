@@ -15,9 +15,12 @@ int main(int argc, char ** argv){
 
     float balance_ratio = 0.45;
     int counter = 1;
+    clock_t start = clock();
     FM fm(argv[1], balance_ratio);
     fm.initialize();
+    std::cout<<"Initialization takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s."<<std::endl;
     while(!fm.stop){
+        start = clock();
         std::cout<<"Start round "<<counter++<<std::endl;
         for(size_t i=0;i<fm.cell_num;++i){
             Cell *c = fm.chooseCell();
@@ -26,6 +29,7 @@ int main(int argc, char ** argv){
         fm.storeResult();
         fm.unlockAll();
         fm.initialize();
+        std::cout<<"Round "<<counter<<" takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s."<<std::endl;
     }
     fm.writeOutput(out_name);
 
