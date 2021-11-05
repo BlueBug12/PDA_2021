@@ -40,8 +40,9 @@ public:
     std::vector<Net*>all_nets;
     std::unordered_map<int, Cell*>all_cells;
     std::vector<std::pair<int,Cell*>>ordered_cells;
-    Record *best_record;
     bool stop;
+    int min_cut;
+    float best_balance;
     
 private:
     std::vector<std::list<Cell*>>_l_group;

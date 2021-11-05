@@ -4,14 +4,19 @@ FM::FM(const std::string & file_name, float ratio){
     _left_num = 0;
     _right_num = 0;
     stop = false;
-    best_record = NULL;
     readInput(file_name);
+    min_cut = getCutSize();
+    best_balance = std::min((float)_left_num/cell_num,(float)_right_num/cell_num);
+    std::cout<<cell_num<<" "<<_left_num<<" "<<_right_num<<std::endl; 
+    std::cout<<min_cut<<" "<<best_balance<<std::endl;
     if(ratio>=0.5){
         max_group = cell_num*ratio;
     }else{
         max_group = cell_num*(1-ratio);
     }
     min_group = cell_num - max_group;
+    if(min_group>max_group)
+        std::swap(min_group,max_group);
     _shift = 0;
     for(auto & pair: all_cells){
         _shift = std::max(_shift,(int)pair.second->nets.size());
@@ -29,7 +34,6 @@ FM::~FM(){
         delete n;
     for(auto pair: all_cells)
         delete pair.second;
-    delete best_record;
 }
 void FM::readInput(const std::string & file_name){
     std::ifstream fin{file_name};
@@ -57,6 +61,10 @@ void FM::readInput(const std::string & file_name){
                 c = new Cell(cell_id,side);
                 all_cells[cell_id] = c;
                 side = !side;
+                if(c->left)
+                    _left_num++;
+                else
+                    _right_num++;
             }else{
                 c = cell_iter->second;
             }
@@ -65,12 +73,10 @@ void FM::readInput(const std::string & file_name){
             c->nets.push_back(n);
 
             if(c->left){
-                n->l_cells++;
-                _left_num++;
+                n->init_l_cells++;
             }
             else{
-                n->r_cells++;
-                _right_num++;
+                n->init_r_cells++;
             }
             
             pre_pos = pos+1;
@@ -78,8 +84,10 @@ void FM::readInput(const std::string & file_name){
         }
         net_id++;
         all_nets.push_back(n);
+        n->l_cells = n->init_l_cells;
+        n->r_cells = n->init_r_cells;
     }
-
+    
     for(auto pair: all_cells)
         ordered_cells.push_back({pair.second->cell_id,pair.second});
     sort(ordered_cells.begin(),ordered_cells.end());
@@ -139,12 +147,32 @@ void FM::resetGain(){
         pair.second->gain = 0;
     for(size_t i=0;i<all_nets.size();++i){
         Net *n = all_nets[i];
+        n->l_cells = n->init_l_cells;
+        n->r_cells = n->init_r_cells;
+
+#ifdef DEBUG
+            if((int)n->cells.size()!=n->l_cells+n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(7).");
+            int l_c = 0;
+            int r_c = 0;
+            for(Cell* c: n->cells){
+                if(c->init_left)
+                    ++l_c;
+                else
+                    ++r_c;
+            }
+            if(l_c!=n->l_cells)
+                throw std::runtime_error("Error: cell size unmatched(8).");
+
+            if(r_c!=n->r_cells)
+                throw std::runtime_error("Error: cell size unmatched(9).");
+#endif
         //all cells locate at right / left group
         if(n->l_cells == 0){
             for(Cell *c: n->cells){
                 c->gain--;
 #ifdef DEBUG
-                if(c->left){
+                if(c->init_left){
                     throw std::runtime_error("Error: cell in the wrong group(1).");
                 }
 #endif
@@ -153,7 +181,7 @@ void FM::resetGain(){
             for(Cell* c: n->cells){
                 c->gain--;
 #ifdef DEBUG
-                if(!c->left){
+                if(!c->init_left){
                     throw std::runtime_error("Error: cell in the wrong group(2).");
                 }
 #endif
@@ -173,11 +201,8 @@ void FM::resetGain(){
 
 void FM::initialize(){
     resetGain();
-    Record initial_r(getCutSize(),std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
-    std::cout<<"cut size:"<<initial_r.cut_size<<std::endl;
-    if(!best_record)
-        best_record = new Record(initial_r);
-    recorder.push_back(std::move(initial_r));
+    std::cout<<"Best cut size:"<<min_cut<<std::endl;
+    std::cout<<"cut size:"<<getCutSize()<<std::endl;
 
     //set the initial bucket list
     for(size_t i=0;i<ordered_cells.size();++i){
@@ -399,9 +424,12 @@ void FM::updateGain(Cell* target){
             }
         }
     }
+    int pre_sum = 0;
+    if(!recorder.empty())
+        pre_sum = recorder.back().gain_sum;
     Record r(target,
             origin_gain,
-            origin_gain+recorder.back().gain_sum,
+            origin_gain+pre_sum,
             getCutSize(),
             std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
     recorder.push_back(std::move(r));
@@ -441,7 +469,7 @@ Cell* FM::chooseCell(){
         if(c->lock)
             ++l;
     }
-    std::cerr<<"luck: "<<l<<"  unlock: "<<all_nets.size()-l<<std::endl;
+    std::cerr<<"lock: "<<l<<"  unlock: "<<all_nets.size()-l<<std::endl;
     std::cerr<<"move right "<<move_right<<std::endl;
     std::cerr<<"move lefti "<<move_left<<std::endl;
     throw std::runtime_error("Error: can not find unlock cell in the list.");
@@ -457,14 +485,20 @@ inline bool FM::checkBalance(Cell* c){
     return true;
 }
 void FM::unlockAll(){
+    _left_num = 0;
+    _right_num = 0;
     for(size_t i=0;i<ordered_cells.size();++i){
         Cell *c = ordered_cells.at(i).second;
+        c->left = c->init_left;
     #ifdef DEBUG
         if(!c->lock)
             throw std::runtime_error("Error: exist unlock cell after one pass.");
     #endif
         c->lock = false;
-        c->init_left = c->left;
+        if(c->left)
+            ++_left_num;
+        else
+            ++_right_num;
     }
 }
 
@@ -480,33 +514,57 @@ Cell* FM::findTarget(const int net_id, const bool left){
 
 void FM::storeResult(){
     stop = true;
-    float min_cut = best_record->cut_size;
-    float best_balance = best_record->balance_ratio;
+    int min_cut_local = INT_MAX;
+    float best_balance_local = 1.0;
     int index = -1;
     for(size_t i=0;i<recorder.size();++i){
         Record & r = recorder.at(i);
-        if(min_cut > r.cut_size || (min_cut == r.cut_size && r.balance_ratio > best_balance)){
+        if(min_cut_local > r.cut_size || (min_cut_local == r.cut_size && r.balance_ratio > best_balance_local)){
             index = (int)i;
-            best_balance = r.balance_ratio;
-            min_cut = r.cut_size;
+            best_balance_local = r.balance_ratio;
+            min_cut_local = r.cut_size;
         }
-        if(r.gain_sum>0)
+        if(r.gain_sum>0)//if there are some improvements, keep iteration
             stop = false;
     }
-    if(index == -1)
+    if(stop)
         return;
-
+    
     //reset the solution 
-    int i = 0;
-    if(!recorder.front().moved_cell)
-        i = 1;
-    for(;i<=index;++i){
+    bool flag = false;
+    if(min_cut > min_cut_local || (min_cut == min_cut_local && best_balance_local > best_balance)){
+        flag = true;
+        min_cut = min_cut_local;
+        best_balance = best_balance_local;
+    }
+        flag = true;
+#ifdef DEBUG
+    std::cout<<"Result in this round:"<<std::endl;
+    std::cout<<"min cut size:"<<min_cut_local<<std::endl;
+    std::cout<<"best balance ratio:"<<best_balance_local<<std::endl;
+    std::cout<<"index:"<<index<<std::endl;
+    if(flag)
+        std::cout<<"Find better solution."<<std::endl;
+    else
+        std::cout<<"No imporement."<<std::endl;
+    std::cout<<std::endl;
+#endif
+    for(int i = 0;i<=index;++i){
        Record & r = recorder.at(i);
        Cell* c = r.moved_cell;
-       c->ret_left = !c->init_left;
+       c->init_left = !c->init_left;
+       if(flag)
+           c->ret_left = c->init_left;
+       for(Net *n: c->nets){
+           if(c->init_left){
+               n->init_r_cells--; 
+               n->init_l_cells++;
+           }else{
+               n->init_r_cells++; 
+               n->init_l_cells--;
+           }
+       }
     }
-    delete best_record;
-    best_record = new Record(recorder.at(index));
     recorder.clear();
 }
 

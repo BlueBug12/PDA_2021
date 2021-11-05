@@ -30,6 +30,8 @@ struct Net{
     Net(int id): net_id(id){
         l_cells = 0;
         r_cells = 0;
+        init_l_cells = 0;
+        init_r_cells = 0;
     }
     Net() = delete;
     Net(Net const &) = default;
@@ -43,6 +45,8 @@ struct Net{
     int net_id;
     int l_cells;
     int r_cells;
+    int init_l_cells;
+    int init_r_cells;
 };
 
 
@@ -52,6 +56,10 @@ struct Record{
         moved_cell = NULL;
         best_gain = 0;
         gain_sum = 0;
+#ifdef DEBUG
+        if(balance_ratio>0.5)
+            throw std::runtime_error("Error: invalid balance ratio.");
+#endif
     }
     Record() = delete;
     Record(Record const &) = default;
