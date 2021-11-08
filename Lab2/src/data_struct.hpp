@@ -25,7 +25,7 @@ struct Cell{
     bool ret_left;//represent solution
     int gain;
 };
-
+/*
 struct Net{
     Net(int id): net_id(id){
         l_cells = 0;
@@ -47,7 +47,7 @@ struct Net{
     int r_cells;
     int init_l_cells;
     int init_r_cells;
-};
+};*/
 
 
 struct Record{

@@ -1,12 +1,8 @@
 #include "FM.hpp"
 
 FM::FM(const std::string & file_name, float ratio){
-    case1 = 0;
-    case2 = 0;
-    case3 = 0;
-    case4 = 0;
-    _left_num = 0;
-    _right_num = 0;
+    m_left_num = 0;
+    m_right_num = 0;
     stop = false;
     readInput(file_name);
     min_cut = getCutSize();
@@ -20,27 +16,16 @@ FM::FM(const std::string & file_name, float ratio){
     min_group = cell_num - max_group;
     if(min_group>max_group)
         std::swap(min_group,max_group);
-    _shift = 0;
-    for(auto & pair: all_cells){
-        _shift = std::max(_shift,(int)pair.second->nets.size());
-    }
-    _l_group.resize(2*_shift + 1);
-    _r_group.resize(2*_shift + 1);
+
 #ifdef PRINTER
     std::cout<<std::endl; 
     std::cout<<"min group:"<<min_group<<std::endl;
     std::cout<<"max group:"<<max_group<<std::endl;
-    std::cout<<"shift value:"<<_shift<<std::endl;
     std::cout<<std::endl; 
 
 #endif
 }
-FM::~FM(){
-    for(Net *n: all_nets)
-        delete n;
-    for(auto pair: all_cells)
-        delete pair.second;
-}
+FM::~FM(){}
 void FM::readInput(const std::string & file_name){
     std::ifstream fin{file_name};
     if(!fin){
@@ -48,65 +33,45 @@ void FM::readInput(const std::string & file_name){
         exit(1);
     }
     fin >> net_num >> cell_num;
-    std::string line;
-    std::getline(fin,line);
-    int net_id = 0;
-    bool side = true;
-    while(std::getline(fin,line)){
-        if(line.back()!=' ')
-            line.push_back(' ');
-        size_t pos = 0;
-        size_t pre_pos = 0;
-        Net *n = new Net(net_id);
-        while((pos = line.find(" ",pre_pos))!=std::string::npos){
-            std::string substr = line.substr(pre_pos,pos-pre_pos);
-            int cell_id = std::stoi(substr);
-            Cell* c;
-            auto cell_iter = all_cells.find(cell_id);
-            if(cell_iter==all_cells.end()){
-                c = new Cell(cell_id,side);
-                all_cells[cell_id] = c;
-                side = !side;
-                if(c->left)
-                    _left_num++;
-                else
-                    _right_num++;
-            }else{
-                c = cell_iter->second;
-            }
 
-            n->cells.push_back(c);
-            c->nets.push_back(n);
-
-            if(c->left){
-                n->init_l_cells++;
-            }
-            else{
-                n->init_r_cells++;
-            }
-            
-            pre_pos = pos+1;
-            
-        }
-        net_id++;
-        all_nets.push_back(n);
-        n->l_cells = n->init_l_cells;
-        n->r_cells = n->init_r_cells;
-    }
+    netlist.resize(net_num);
+    n_l_num.resize(net_num,0);
+    n_r_num.resize(net_num,0);
+    lock.resize(cell_num,false);
+    group.resize(cell_num,false);
     
-    for(auto pair: all_cells)
-        ordered_cells.push_back({pair.second->cell_id,pair.second});
-    sort(ordered_cells.begin(),ordered_cells.end());
 
+
+    std::string line;
+    bool side = true;
+    int c_id;
+    for(int i=0;i<net_num;++i){
+        std::getline(fin,line);
+        std::istringstream ss;
+        while(ss >> c_id){
+             int pseudo_id;
+             bool cur_group;
+             if(key.find(c_id)==key.end()){
+                key[c_id] = (int)key.size();
+                pseudo_id = (int)key.size();
+                group.at(pseudo_id) = side;
+                cur_group = side;
+                side = !side;
+             }else{
+                pseudo_id = key[c_id];
+                cur_group = group.at(pseudo_id);
+             }
+             if(cur_group){
+                n_l_num.at(i)++;
+                m_left_cell++;
+             }else{
+                n_r_num.at(i)++;
+                m_right_cell++;
+             }
+             netlist.at(i).push_back(pseudo_id);
+        }
+    }
     fin.close();
-#ifdef DEBUG
-    if(all_nets.size()!=net_num){
-        throw std::runtime_error("Error: net number unmatched");
-    }
-    if(all_cells.size()!=cell_num){
-        throw std::runtime_error("Error: cell number unmatched");
-    }
-#endif
 }
 
 void FM::writeOutput(const std::string & file_name){
@@ -532,10 +497,9 @@ void FM::storeResult(){
 
 inline int FM::getCutSize(){
     int cut_size = 0;
-    for(Net *n:all_nets){
-        if(n->l_cells !=0 && n->r_cells !=0){//exist cross edge
+    for(size_t i=0;i<net_num;++i){
+        if(n_l_num.at(i)!=r_l_num.at(i))
             ++cut_size;
-        }
     }
     return cut_size;
 }

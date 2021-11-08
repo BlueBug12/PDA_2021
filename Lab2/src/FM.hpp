@@ -39,23 +39,25 @@ public:
     size_t net_num;
     int min_group;
     int max_group;
-    std::vector<Net*>all_nets;
-    std::unordered_map<int, Cell*>all_cells;
-    std::vector<std::pair<int,Cell*>>ordered_cells;
+    //std::vector<Net*>all_nets;
+    //std::vector<std::pair<int,Cell*>>ordered_cells;
     bool stop;
     int min_cut;
     float best_balance;
-    int case1;
-    int case2;
-    int case3;
-    int case4;
+
+    std::vector<std::vector<int>> netlist;
+    std::vector<int> n_l_num;
+    std::vector<int> n_r_num;
+    std::vector<bool>lock;
+    std::vector<bool>group;
+    std::set<int> cell;
+    std::map<int,int>key;//real id : pseudo id 
 private:
-    std::vector<std::list<Cell*>>_l_group;
-    std::vector<std::list<Cell*>>_r_group;
-    std::vector<Record>recorder;
-    int _left_num;
-    int _right_num;
-    int _shift;// = Pmax (for the bucket )
+    std::map<int,std::set<int>>m_l_group;
+    std::vector<int,std::set<int>>m_r_group;
+    
+    int m_left_cell;
+    int m_right_cell;
 };
 
 #endif
