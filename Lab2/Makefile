@@ -15,7 +15,7 @@ all: $(TARGET) $(OBJS)
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp 
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(SRCDIR)/FM.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean

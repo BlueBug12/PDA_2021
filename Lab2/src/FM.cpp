@@ -1,13 +1,9 @@
 #include "FM.hpp"
 
 FM::FM(const std::string & file_name, float ratio){
-    m_left_num = 0;
-    m_right_num = 0;
+    cell_counter[0] = cell_counter[1] = 0;
     stop = false;
     readInput(file_name);
-    min_cut = getCutSize();
-    best_balance = std::min((float)_left_num/cell_num,(float)_right_num/cell_num);
-
     if(ratio>=0.5){
         max_group = cell_num*ratio;
     }else{
@@ -17,15 +13,10 @@ FM::FM(const std::string & file_name, float ratio){
     if(min_group>max_group)
         std::swap(min_group,max_group);
 
-#ifdef PRINTER
-    std::cout<<std::endl; 
-    std::cout<<"min group:"<<min_group<<std::endl;
-    std::cout<<"max group:"<<max_group<<std::endl;
-    std::cout<<std::endl; 
-
-#endif
+    min_cut = getCutSize();
+    answer = group;
 }
-FM::~FM(){}
+
 void FM::readInput(const std::string & file_name){
     std::ifstream fin{file_name};
     if(!fin){
@@ -34,41 +25,37 @@ void FM::readInput(const std::string & file_name){
     }
     fin >> net_num >> cell_num;
 
-    netlist.resize(net_num);
-    n_l_num.resize(net_num,0);
-    n_r_num.resize(net_num,0);
-    lock.resize(cell_num,false);
+    net_list.resize(net_num);
+    cell_num_in_net[0].resize(net_num,0);
+    cell_num_in_net[1].resize(net_num,0);
+    cell_list.resize(cell_num);
     group.resize(cell_num,false);
+    cell_gain.resize(cell_num,0);
     
-
-
     std::string line;
     bool side = true;
     int c_id;
-    for(int i=0;i<net_num;++i){
+    std::getline(fin,line);
+    for(size_t i=0;i<net_num;++i){
         std::getline(fin,line);
-        std::istringstream ss;
+        std::istringstream ss(line);
         while(ss >> c_id){
-             int pseudo_id;
-             bool cur_group;
-             if(key.find(c_id)==key.end()){
-                key[c_id] = (int)key.size();
-                pseudo_id = (int)key.size();
+            size_t pseudo_id;
+            bool cur_group;
+            if(key.find(c_id)==key.end()){
+                pseudo_id = key.size();
+                key[c_id] = pseudo_id;
                 group.at(pseudo_id) = side;
                 cur_group = side;
                 side = !side;
-             }else{
+            }else{
                 pseudo_id = key[c_id];
                 cur_group = group.at(pseudo_id);
-             }
-             if(cur_group){
-                n_l_num.at(i)++;
-                m_left_cell++;
-             }else{
-                n_r_num.at(i)++;
-                m_right_cell++;
-             }
-             netlist.at(i).push_back(pseudo_id);
+            }
+            cell_num_in_net[cur_group].at(i)++;
+            cell_counter[cur_group]++;
+            net_list.at(i).push_back(pseudo_id);
+            cell_list.at(pseudo_id).push_back(i);
         }
     }
     fin.close();
@@ -80,426 +67,146 @@ void FM::writeOutput(const std::string & file_name){
         std::cerr << "Error: can not open file "<< file_name << std::endl;
         exit(1);
     }
-
-    for(size_t i =0;i<ordered_cells.size();++i){
-        fout << ordered_cells[i].second->ret_left <<std::endl;
+    for(auto & p:key){
+        fout << answer.at(p.second) << std::endl;
     }
     fout.close();
 }
-
-void FM::resetGain(){
-    for(auto pair: all_cells)
-        pair.second->gain = 0;
-    for(size_t i=0;i<all_nets.size();++i){
-        Net *n = all_nets[i];
-        n->l_cells = n->init_l_cells;
-        n->r_cells = n->init_r_cells;
-        
-#ifdef DEBUG
-            if((int)n->cells.size()!=n->l_cells+n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(7).");
-            int l_c = 0;
-            int r_c = 0;
-            for(Cell* c: n->cells){
-                if(c->init_left)
-                    ++l_c;
-                else
-                    ++r_c;
-            }
-            if(l_c!=n->l_cells)
-                throw std::runtime_error("Error: cell size unmatched(8).");
-
-            if(r_c!=n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(9).");
-#endif
-        //all cells locate at right / left group
-        if(n->l_cells == 0){
-            for(Cell *c: n->cells){
-                c->gain--;
-#ifdef DEBUG
-                if(c->init_left){
-                    throw std::runtime_error("Error: cell in the wrong group(1).");
-                }
-#endif
-            }
-        }else if(n->r_cells == 0){
-            for(Cell* c: n->cells){
-                c->gain--;
-#ifdef DEBUG
-                if(!c->init_left){
-                    throw std::runtime_error("Error: cell in the wrong group(2).");
-                }
-#endif
-            }
-        }else{//at least one cell locate at both sides
-            if(n->l_cells == 1){
-                Cell *c = findTarget(n->net_id, true);//left side == true
-                c->gain++;
-            }
-            if(n->r_cells == 1){
-                Cell *c = findTarget(n->net_id, false);//left side == true
-                c->gain++;
-            }
-        }       
+int FM::calGain(size_t cell_id){
+    int gain = 0;
+    for(int net_id:cell_list.at(cell_id)){
+        if(cell_num_in_net[group[cell_id]].at(net_id) == 1)//cell  is the only one locate at this side for this net
+            gain++;
+        else if(cell_num_in_net[!group[cell_id]].at(net_id) == 0)//the other side doesn't exist any cell for this net
+            gain--;
     }
+    return gain;
 }
+
 
 void FM::initialize(){
-    resetGain();
-    std::cout<<"Best cut size:"<<min_cut<<std::endl;
-    std::cout<<"cut size:"<<getCutSize()<<std::endl;
-
-    //set the initial bucket list
-    for(size_t i=0;i<ordered_cells.size();++i){
-        Cell *c = ordered_cells.at(i).second;
-        int index = c->gain+_shift;
-#ifdef DEBUG
-        if(index<0 || index>=(int)_l_group.size()){
-            throw std::runtime_error("Error: wrong shifted index.");
-        }
-#endif
-        if(c->left){
-            _l_group.at(index).push_back(c);
-        }else{
-            _r_group.at(index).push_back(c);
-        }
-    }
-}
-void FM::updateGain(Cell* target){
-    //in this function, we don't care whether or not the cell is lock
-    target->lock = true;
-    int origin_gain = target->gain;
-    std::unordered_map<Cell *, int> table;//record the origin gain of modified cell
-    if(target->left){//move cell from left to right
-        _left_num--;
-        _right_num++;
-        target->left = false;
-        for(Net* n: target->nets){
-            if(n->r_cells == 0){//To
-                ++case1;
-                for(Cell* c: n->cells){
-                    if(c->lock)
-                        continue;
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain++;
-    #ifdef DEBUG
-                    if(!c->left){
-                        std::cerr<<"found cell "<<c->cell_id<<std::endl;
-                        throw std::runtime_error("Error: cell in the wrong group(3).");
-                    }
-    #endif
-                }
-            }else if(n->r_cells == 1){
-                ++case2;
-
-                Cell *c = findTarget(n->net_id,false);
-                if(c){
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain--;
-                }
-            }
-
-            n->l_cells--;
-            n->r_cells++;
-
-            if(n->l_cells == 0){//From
-                ++case3;
-
-                for(Cell* c: n->cells){
-                    if(c->lock)
-                        continue;
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain--;
-                }
-            }else if(n->l_cells == 1){
-                ++case4;
-
-                Cell* c = findTarget(n->net_id,true);
-                if(c){
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain++;
-                }
-            }
-#ifdef DEBUG
-            if((int)n->cells.size()!=n->l_cells+n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(4).");
-            int l_c = 0;
-            int r_c = 0;
-            for(Cell* c: n->cells){
-                if(c->left)
-                    ++l_c;
-                else
-                    ++r_c;
-            }
-            if(l_c!=n->l_cells)
-                throw std::runtime_error("Error: cell size unmatched(5).");
-
-            if(r_c!=n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(6).");
-#endif
-        }
-    }else{//move cell from right to left
-        _right_num--;
-        _left_num++;
-        target->left = true;
-        for(Net *n: target->nets){
-            if(n->l_cells == 0){//To
-                ++case1;
-
-                for(Cell* c: n->cells){
-                    if(c->lock)
-                        continue;
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain++;
-    #ifdef DEBUG
-                    if(c->left){
-                        throw std::runtime_error("Error: cell in the wrong group(4).");
-                    }
-    #endif
-                }
-            }else if(n->l_cells == 1){
-                ++case2;
-
-                Cell *c = findTarget(n->net_id,true);
-                if(c){
-                    if(table.find(c)==table.end()){
-                       table.insert({c,c->gain});
-                    }
-                    c->gain--;
-                }
-            }
-
-            n->r_cells--;
-            n->l_cells++;
-
-
-            if(n->r_cells == 0){//from
-                ++case3;
-
-                for(Cell* c: n->cells){
-                    if(c->lock)
-                        continue;
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain--;
-                }
-            }else if(n->r_cells == 1){
-                ++case4;
-
-                Cell *c = findTarget(n->net_id,false);
-                if(c){
-                    if(table.find(c)==table.end()){
-                        table.insert({c,c->gain});
-                    }
-                    c->gain++;
-                }
-            }
-         
-#ifdef DEBUG
-            if((int)n->cells.size()!=n->l_cells+n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(1).");
-            int l_c = 0;
-            int r_c = 0;
-            for(Cell* c: n->cells){
-                if(c->left)
-                    ++l_c;
-                else
-                    ++r_c;
-            }
-            if(l_c!=n->l_cells)
-                throw std::runtime_error("Error: cell size unmatched(2).");
-
-            if(r_c!=n->r_cells)
-                throw std::runtime_error("Error: cell size unmatched(3).");
-#endif
-        }
-    }
-
-    //update bucket list
-    for(auto pair: table){
-        Cell *c = pair.first;
-        int index = pair.second + _shift;
-        std::vector<std::list<Cell*>> *group;
-        if(c->left){
-            group = &_l_group;
-        }else{
-            group = &_r_group;
-        }
-        std::list<Cell*>& bucket = group->at(index);
-
-        for(auto iter = bucket.begin();iter!=bucket.end();++iter){
-            if(*iter == c){
-                bucket.erase(iter);
-#ifdef DEBUG
-                if(c->gain + _shift>=(int)group->size()||c->gain + _shift<0)
-                    throw std::runtime_error("Error: index out of range when update bucket.");
-#endif
-                group->at(c->gain + _shift).push_back(c);
-                break;
-            }
-        }
-    }
-    int pre_sum = 0;
-    if(!recorder.empty())
-        pre_sum = recorder.back().gain_sum;
-    Record r(target,
-            origin_gain,
-            origin_gain+pre_sum,
-            getCutSize(),
-            std::min((float)_left_num/cell_num,(float)_right_num/cell_num));
-    recorder.push_back(std::move(r));
-}
-Cell* FM::chooseCell(){
-    bool move_left = true;
-    bool move_right = true;
-    if(_left_num - 1 < min_group)
-        move_right = false;
-    if(_right_num - 1 < min_group)
-        move_left = false;
-    //find the unlock cell with greatest gain without viloating balance
-    for(int i = (int)_l_group.size()-1;i>=0;--i){
-        if(move_right && !_l_group.at(i).empty()){
-            for(auto iter = _l_group.at(i).begin();iter!=_l_group.at(i).end();++iter){
-                if(!(*iter)->lock){
-                    Cell *c = (*iter);
-                    _l_group.at(i).erase(iter);
-                    return c;
-                }
-            }
-        }
-        if(move_left && !_r_group.at(i).empty()){
-            for(auto iter = _r_group.at(i).begin();iter!=_r_group.at(i).end();++iter){
-                if(!(*iter)->lock){
-                    Cell *c = (*iter);
-                    _r_group.at(i).erase(iter);
-                    return c;
-                }
-            }
-        }
-    }
-#ifdef DEBUG
-    size_t l = 0;
-    for(auto pair: all_cells){
-        Cell *c = pair.second;
-        if(c->lock)
-            ++l;
-    }
-    std::cerr<<"lock: "<<l<<"  unlock: "<<all_nets.size()-l<<std::endl;
-    std::cerr<<"move right "<<move_right<<std::endl;
-    std::cerr<<"move lefti "<<move_left<<std::endl;
-    throw std::runtime_error("Error: can not find unlock cell in the list.");
-#endif
-    return NULL;
-} 
-inline bool FM::checkBalance(Cell* c){
-    if(c->left && _left_num - 1 < min_group){
-        return false;
-    }
-    if(!c->left && _right_num - 1 < min_group){
-        return false;
-    }
-    return true;
-}
-void FM::unlockAll(){
-    _left_num = 0;
-    _right_num = 0;
-    for(size_t i=0;i<ordered_cells.size();++i){
-        Cell *c = ordered_cells.at(i).second;
-        c->left = c->init_left;
-    #ifdef DEBUG
-        if(!c->lock)
-            throw std::runtime_error("Error: exist unlock cell after one pass.");
-    #endif
-        c->lock = false;
-        if(c->left)
-            ++_left_num;
-        else
-            ++_right_num;
+    for(size_t i=0;i<cell_num;++i){
+        int gain = calGain(i);
+        bucket[group.at(i)].insert({gain,i});
+        cell_gain.at(i) = gain;
     }
 }
 
-Cell* FM::findTarget(const int net_id, const bool left){
-    std::vector<Cell*>& c_set = all_nets.at(net_id)->cells;
-    for(Cell* c: c_set){
-        if(c->left == left && !c->lock){
-            return c;
-        }
-    }
-    return NULL;
-}
 
-void FM::storeResult(){
-    stop = true;
-    int min_cut_local = INT_MAX;
-    float best_balance_local = 1.0;
-    int index = -1;
-    for(size_t i=0;i<recorder.size();++i){
-        Record & r = recorder.at(i);
-        if(min_cut_local > r.cut_size || (min_cut_local == r.cut_size && r.balance_ratio > best_balance_local)){
-            index = (int)i;
-            best_balance_local = r.balance_ratio;
-            min_cut_local = r.cut_size;
-        }
-        if(r.gain_sum>0)//if there are some improvements, keep iteration
-            stop = false;
-    }
-    if(stop)
-        return;
+void FM::updateGain(size_t cell_id){
+    bool from = group.at(cell_id);
+    bool to = !group.at(cell_id);
+    cell_counter[from]--;
+    cell_counter[to]++;
     
-    //reset the solution 
-    bool flag = false;
-    if(min_cut > min_cut_local || (min_cut == min_cut_local && best_balance_local > best_balance)){
-        flag = true;
-        min_cut = min_cut_local;
-        best_balance = best_balance_local;
+    for(size_t net_id: cell_list.at(cell_id)){
+        if(cell_num_in_net[to].at(net_id) == 0){
+            for(size_t con_cell:net_list.at(net_id)){
+                auto it = bucket[from].find({cell_gain.at(con_cell),con_cell});
+                if(it!= bucket[from].end()){
+                    bucket[from].erase(it);
+                    cell_gain.at(con_cell)++;
+                    bucket[from].insert({cell_gain.at(con_cell),con_cell});
+                }
+            }
+        }else if(cell_num_in_net[to].at(net_id) == 1){
+            for(size_t con_cell:net_list.at(net_id)){
+                if(group.at(con_cell)!=to)
+                    continue;
+                auto it = bucket[to].find({cell_gain.at(con_cell),con_cell});
+                if(it!= bucket[to].end()){
+                    bucket[to].erase(it);
+                    cell_gain.at(con_cell)--;
+                    bucket[to].insert({cell_gain.at(con_cell),con_cell});
+                }
+            }
+        }
+        cell_num_in_net[to].at(net_id)++;
+        cell_num_in_net[from].at(net_id)--;
+        if(cell_num_in_net[from].at(net_id)==0){
+            for(size_t con_cell:net_list.at(net_id)){
+                auto it = bucket[to].find({cell_gain.at(con_cell),con_cell});
+                if(it!=bucket[to].end()){
+                    bucket[to].erase(it);
+                    cell_gain.at(con_cell)--;
+                    bucket[to].insert({cell_gain.at(con_cell),con_cell});
+                }
+            }
+        }else if(cell_num_in_net[from].at(net_id)==1){
+            for(size_t con_cell:net_list.at(net_id)){
+                if(group.at(con_cell)!=from)
+                    continue;
+                auto it = bucket[from].find({cell_gain.at(con_cell),con_cell});
+                if(it!=bucket[from].end()){
+                    bucket[from].erase(it);
+                    cell_gain.at(con_cell)++;
+                    bucket[from].insert({cell_gain.at(con_cell),con_cell});
+                }
+            }
+        }
+
     }
-        flag = true;
-#ifdef PRINTER
-    std::cout<<"Result in this round:"<<std::endl;
-    std::cout<<"min cut size:"<<min_cut_local<<std::endl;
-    std::cout<<"best balance ratio:"<<best_balance_local<<std::endl;
-    std::cout<<"index:"<<index<<std::endl;
-    if(flag)
-        std::cout<<"Find better solution."<<std::endl;
-    else
-        std::cout<<"No imporement."<<std::endl;
-    std::cout<<std::endl;
-#endif
-    for(int i = 0;i<=index;++i){
-       Record & r = recorder.at(i);
-       Cell* c = r.moved_cell;
-       c->init_left = !c->init_left;
-       if(flag)
-           c->ret_left = c->init_left;
-       for(Net *n: c->nets){
-           if(c->init_left){
-               n->init_r_cells--; 
-               n->init_l_cells++;
-           }else{
-               n->init_r_cells++; 
-               n->init_l_cells--;
-           }
-       }
+    
+    group.at(cell_id) = !group.at(cell_id);
+    if(getCutSize()<min_cut){
+        min_cut = getCutSize();
+        answer.clear();
+        answer = group;
     }
-    recorder.clear();
 }
+
+size_t FM::chooseCell(){
+    size_t cell_id;
+    if(bucket[0].empty()||cell_counter[0]==(int)min_group){
+        cell_id = bucket[1].begin()->second;
+        bucket[1].erase(bucket[1].begin());
+    }else if(bucket[1].empty()||cell_counter[1]==(int)min_group){
+        cell_id = bucket[0].begin()->second;
+        bucket[0].erase(bucket[0].begin());
+    }else{
+        if(bucket[0].begin()->second>=bucket[1].begin()->second){
+            cell_id = bucket[0].begin()->second;
+            bucket[0].erase(bucket[0].begin());
+        }else{
+            cell_id = bucket[1].begin()->second;
+            bucket[1].erase(bucket[1].begin());
+        }
+    }
+    return cell_id;
+} 
 
 inline int FM::getCutSize(){
     int cut_size = 0;
     for(size_t i=0;i<net_num;++i){
-        if(n_l_num.at(i)!=r_l_num.at(i))
+        if(cell_num_in_net[0].at(i) && cell_num_in_net[1].at(i))
             ++cut_size;
     }
     return cut_size;
+}
+
+void FM::run(){
+    //clock_t start = clock();
+    //clock_t temp;
+    initialize();
+    //std::cout<<"initialize takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
+    std::cout<<"initial cutsize:"<<getCutSize()<<std::endl;
+    while(!stop){
+        for(size_t i=0;i<cell_num;++i){
+            //start = clock();
+            size_t cell_id = chooseCell();
+            //std::cout<<"chooseCell takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
+            //start = clock();
+            updateGain(cell_id);
+
+            //std::cout<<"updateGain takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
+        }
+        std::cout<<std::endl;
+        stop=true;
+        std::cout<<"final cutsize:"<<min_cut<<std::endl;
+
+#ifdef DEBUG
+        assert(bucket[0].empty() && bucket[1].empty());            
+#endif 
+        initialize();
+    }
 }
