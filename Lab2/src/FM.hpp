@@ -39,6 +39,7 @@ public:
     
     bool stop;
     int min_cut;
+    int current_cut;
 
     std::vector<std::vector<size_t>> net_list;//store the cell list for each net
     std::vector<std::vector<size_t>> cell_list;//store the net list for each cell
