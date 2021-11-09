@@ -2,13 +2,8 @@
 
 FM::FM(const std::string & file_name, float ratio){
     cell_counter[0] = cell_counter[1] = 0;
-    stop = false;
     readInput(file_name);
-    if(ratio>=0.5){
-        max_group = cell_num*ratio;
-    }else{
-        max_group = cell_num*(1-ratio);
-    }
+    max_group = cell_num*ratio;
     min_group = cell_num - max_group;
     if(min_group>max_group)
         std::swap(min_group,max_group);
@@ -39,9 +34,9 @@ void FM::readInput(const std::string & file_name){
     for(size_t i=0;i<net_num;++i){
         std::getline(fin,line);
         std::istringstream ss(line);
+        size_t pseudo_id;
+        bool cur_group;
         while(ss >> c_id){
-            size_t pseudo_id;
-            bool cur_group;
             if(key.find(c_id)==key.end()){
                 pseudo_id = key.size();
                 key[c_id] = pseudo_id;
@@ -57,6 +52,17 @@ void FM::readInput(const std::string & file_name){
             net_list[i].push_back(pseudo_id);
             cell_list[pseudo_id].push_back(i);
         }
+        if(net_list[i].size()==1){
+            cell_num_in_net[cur_group][i]--;
+            cell_counter[cur_group]--;
+            net_list[i].clear();
+            cell_list[pseudo_id].pop_back();
+            
+            --i;
+            --net_num;
+        }
+        //std::cout<<net_list[i].size()<<std::endl;
+        //assert(net_list[i].size()>1);
     }
     fin.close();
 }
@@ -83,7 +89,6 @@ int FM::calGain(size_t cell_id){
     return gain;
 }
 
-
 void FM::initialize(){
     for(size_t i=0;i<cell_num;++i){
         int gain = calGain(i);
@@ -91,7 +96,6 @@ void FM::initialize(){
         cell_gain[i] = gain;
     }
 }
-
 
 void FM::updateGain(size_t cell_id){
     current_cut -= cell_gain[cell_id];
@@ -122,8 +126,10 @@ void FM::updateGain(size_t cell_id){
                 }
             }
         }
+
         cell_num_in_net[to][net_id]++;
         cell_num_in_net[from][net_id]--;
+
         if(cell_num_in_net[from][net_id]==0){
             for(size_t con_cell:net_list[net_id]){
                 auto it = bucket[to].find({cell_gain[con_cell],con_cell});
@@ -145,18 +151,19 @@ void FM::updateGain(size_t cell_id){
                 }
             }
         }
-
     }
     
     group[cell_id] = !group[cell_id];
-    
+#ifdef DEBUG
+    if(getCutSize()!=current_cut){
+        std::cerr<<"wrong!"<<std::endl;
+        exit(1);
+    }
+#endif 
     if(current_cut<min_cut){
-        for(size_t i=0;i<cell_num;++i){
-            answer[i] = group[i];
-        }
+        answer.clear();
+        answer = group;
         min_cut = current_cut;
-        //answer.clear();
-        //answer = group;
     }
 }
 
@@ -183,35 +190,71 @@ size_t FM::chooseCell(){
 inline int FM::getCutSize(){
     int cut_size = 0;
     for(size_t i=0;i<net_num;++i){
+#ifdef DEBUG
+        assert(cell_num_in_net[0][i]>=0);
+        assert(cell_num_in_net[1][i]>=0);
+#endif
         if(cell_num_in_net[0][i] && cell_num_in_net[1][i])
             ++cut_size;
     }
     return cut_size;
 }
 
-void FM::run(){
-    //clock_t start = clock();
-    //clock_t temp;
-    initialize();
-    //std::cout<<"initialize takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
-    std::cout<<"initial cutsize:"<<getCutSize()<<std::endl;
-    while(!stop){
-        for(size_t i=0;i<cell_num;++i){
-            //start = clock();
-            size_t cell_id = chooseCell();
-            //std::cout<<"chooseCell takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
-            //start = clock();
-            updateGain(cell_id);
-
-            //std::cout<<"updateGain takes "<<double(clock()-start)/CLOCKS_PER_SEC<<" s"<<std::endl;
+void FM::undoGroup(){
+    for(size_t i=0;i<cell_num;++i){
+        if(group[i]!=answer[i]){
+            for(size_t net_id:cell_list[i]){
+                if(group[i]){
+                    cell_num_in_net[1][net_id]--;
+                    cell_num_in_net[0][net_id]++;
+                }else{
+                    cell_num_in_net[1][net_id]++;
+                    cell_num_in_net[0][net_id]--;
+                }
+            }
+            group[i] = answer[i];
         }
-        std::cout<<std::endl;
-        stop=true;
-        std::cout<<"final cutsize:"<<min_cut<<std::endl;
+    }
+}
 
+void FM::run(){
+    std::cout<<"Initial cutsize:"<<current_cut<<std::endl;
+    int origin_min_cut = 1e9;
+    int counter = 1;
+    while(1){
+        origin_min_cut = min_cut;
+        initialize();
+        for(size_t i=0;i<cell_num;++i){
+            size_t cell_id = chooseCell();
+            updateGain(cell_id);
+        }
+        if(origin_min_cut == min_cut)
+            break;
 #ifdef DEBUG
         assert(bucket[0].empty() && bucket[1].empty());            
 #endif 
-        initialize();
+        undoGroup();
+
+#ifdef DEBUG
+        std::vector<int>test[2];
+        test[0].resize(net_num);
+        test[1].resize(net_num);
+        for(size_t i=0;i<cell_num;++i){
+            for(size_t net_id:cell_list[i]){
+                test[group[i]][net_id]++;
+            }
+        }
+
+        for(size_t i=0;i<net_num;++i){
+            assert(test[0][i]==cell_num_in_net[0][i]&&test[1][i]==cell_num_in_net[1][i]);
+        }
+        
+        std::cout<<min_cut<<std::endl;
+        std::cout<<getCutSize()<<std::endl;
+        assert(getCutSize()==min_cut);
+#endif
+        current_cut = min_cut;
+        std::cout<<"Round "<<counter++<<" cutsize: "<<min_cut<<std::endl;
     }
+    std::cout<<"final cutsize:"<<min_cut<<std::endl;
 }

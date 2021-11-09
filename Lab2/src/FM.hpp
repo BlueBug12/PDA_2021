@@ -1,6 +1,6 @@
 #ifndef FM_HPP 
 #define FM_HPP
-#define DEBUG
+//#define DEBUG
 //#define PRINTER 
 
 #include <vector>
@@ -30,14 +30,14 @@ public:
     size_t chooseCell();//choose the valid candidate with largest gain 
     inline int getCutSize();
     int calGain(size_t cell_id);
+    void undoGroup();
     void run();
 
     size_t cell_num;
     size_t net_num;
     size_t min_group;
     size_t max_group;
-    
-    bool stop;
+
     int min_cut;
     int current_cut;
 
