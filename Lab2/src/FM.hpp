@@ -1,7 +1,7 @@
 #ifndef FM_HPP 
 #define FM_HPP
-#define DEBUG
-//#define PRINTER 
+//#define DEBUG
+#define PRINTER 
 
 #include <vector>
 #include <climits>
@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <ctime>
+#include <algorithm>
 #include <map>
 #include <set>
 #include <assert.h>
@@ -26,6 +27,9 @@ public:
     void readInput(const std::string & file_name);
     void writeOutput(const std::string & file_name);
     void preprocess();
+    void preprocess2(size_t set_num);
+    int collapse(size_t cell_id);
+    void merge(size_t c1, size_t c2);
     void initialize();//distribute cells into two groups and set the initial F T values
     void updateGain(size_t cell_id);//update net gain & cell gain
     size_t chooseCell();//choose the valid candidate with largest gain 
@@ -44,6 +48,8 @@ public:
 
     std::vector<std::vector<size_t>> net_list;//store the cell list for each net
     std::vector<std::vector<size_t>> cell_list;//store the net list for each cell
+    std::vector<std::vector<size_t>>set_record;
+    std::vector<size_t>ds;
 
     std::vector<int>cell_num_in_net[2];
     std::vector<bool>group;

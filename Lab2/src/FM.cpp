@@ -24,6 +24,14 @@ void FM::readInput(const std::string & file_name){
     cell_num_in_net[0].resize(net_num,0);
     cell_num_in_net[1].resize(net_num,0);
     cell_list.resize(cell_num);
+    set_record.resize(cell_num);
+
+    ds.resize(cell_num);
+    for(size_t i = 0;i<cell_num;++i){
+        ds[i] = i;
+        set_record[i].push_back(i);
+    }
+
     group.resize(cell_num,false);
     cell_gain.resize(cell_num,0);
     
@@ -68,14 +76,99 @@ void FM::readInput(const std::string & file_name){
     fin.close();
 }
 
-void FM::preprocess(){
+int FM::collapse(size_t cell_id){
+    return ds[cell_id]==cell_id ? cell_id:ds[cell_id] = collapse(ds[cell_id]);
+}
+
+void FM::merge(size_t c1, size_t c2){
+    if(set_record[c1].size() > set_record[c2].size()){
+        std::swap(c1,c2);
+    }
+    ds[c1] = c2;
+    set_record[c2].insert(set_record[c2].end(),set_record[c1].begin(),set_record[c1].end());
+    set_record[c1].clear();
+}
+
+void FM::preprocess2(size_t set_num){
+#ifdef PRINTER
     std::cout<<"Cutsize before preprocessing: "<<min_cut<<std::endl;
+#endif
+    std::vector<size_t>heads;
+    size_t max_size = cell_num/set_num + 1;
+    for(size_t i=0;i<net_num;++i){
+        size_t ub = 1000000;
+        size_t c1 = net_list[i].front();
+        for(size_t cell_id:net_list[i]){
+            size_t temp = collapse(cell_id);
+            if(set_record[temp].size()<ub){
+                ub = set_record[temp].size();
+                c1 = temp;
+            }
+        }
+        for(size_t cell_id: net_list[i]){
+            size_t c2 = ds[cell_id];
+            if(c1==c2)
+                continue;
+            if(c1!=c2 && set_record[c1].size()+set_record[c2].size()<=max_size){
+                merge(c1,c2);
+            }else{
+                break;
+            }
+        }
+    }
+    size_t sum=0;
+    for(size_t i=0;i<cell_num;++i){
+        if(!set_record[i].empty()){
+            heads.push_back(i);
+            sum+=set_record[i].size();
+        }
+    }
+    
+#ifdef PRINTER
+    std::cout<<"number of disjoint set:"<<heads.size()<<std::endl;
+    //std::cout<<"max size:"<<max_size<<std::endl;
+#endif 
+    //for(size_t i=0;i<heads.size();++i){
+    //    std::cout<<set_record[heads[i]].size()<<std::endl;
+    //}
+    cell_counter[0] = cell_counter[1] = 0;
+    group.clear();
+    group.resize(cell_num);
+    size_t unplaced = cell_num;
+    bool side = true;
+    for(size_t i=0;i<net_num;++i){
+        cell_num_in_net[0][i] = 0;
+        cell_num_in_net[1][i] = 0;
+    }
+    for(size_t i=0;i<heads.size();++i){
+        for(size_t cell_id: set_record[heads[i]]){
+            group[cell_id] = side;
+            cell_counter[side]++;
+            for(size_t net_id : cell_list[cell_id])
+                cell_num_in_net[side][net_id]++;    
+            --unplaced;
+            if(unplaced <= cell_num/2)
+                side = false;
+        }
+    }
+    answer.clear();
+    answer = group;
+    current_cut = min_cut = getCutSize();
+#ifdef PRINTER
+    std::cout<<"Cutsize after preprocessing: "<<min_cut<<std::endl;
+#endif
+}
+
+void FM::preprocess(){
+#ifdef PRINTER
+    std::cout<<"Cutsize before preprocessing: "<<min_cut<<std::endl;
+#endif
     cell_counter[0] = cell_counter[1] = 0;
     group.clear();
     group.resize(cell_num);
 
-
     std::set<std::pair<size_t,size_t>,std::greater<std::pair<size_t,size_t>>>s;
+    //std::set<std::pair<size_t,size_t>>s;
     for(size_t i=0;i<net_num;++i){
         s.insert({net_list.at(i).size(),i});
     }
@@ -115,7 +208,9 @@ void FM::preprocess(){
     answer.clear();
     answer = group;
     current_cut = min_cut = getCutSize();
+#ifdef PRINTER
     std::cout<<"Cutsize after preprocessing: "<<min_cut<<std::endl;
+#endif
 }
 
 void FM::writeOutput(const std::string & file_name){
@@ -271,7 +366,9 @@ void FM::undoGroup(){
 }
 
 void FM::run(){
+#ifdef PRINTER
     std::cout<<"Initial cutsize:"<<current_cut<<std::endl;
+#endif
     int origin_min_cut = 1e9;
     int counter = 1;
     while(1){
@@ -289,7 +386,11 @@ void FM::run(){
         undoGroup();
 
         current_cut = min_cut;
+#ifdef PRINTER
         std::cout<<"Round "<<counter++<<" cutsize: "<<min_cut<<std::endl;
+#endif
     }
+#ifdef PRINTER
     std::cout<<"final cutsize:"<<min_cut<<std::endl;
+#endif
 }
