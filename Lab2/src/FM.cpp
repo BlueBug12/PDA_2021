@@ -35,7 +35,7 @@ void FM::readInput(const std::string & file_name){
         std::getline(fin,line);
         std::istringstream ss(line);
         size_t pseudo_id;
-        bool cur_group;
+        bool cur_group = 0;
         while(ss >> c_id){
             if(key.find(c_id)==key.end()){
                 pseudo_id = key.size();
@@ -55,7 +55,6 @@ void FM::readInput(const std::string & file_name){
         }
         if(net_list[i].size()==1){
             cell_num_in_net[cur_group][i]--;
-            //cell_counter[cur_group]--;
             net_list[i].clear();
             cell_list[pseudo_id].pop_back();
             
@@ -63,8 +62,60 @@ void FM::readInput(const std::string & file_name){
             --net_num;
         }
     }
+#ifdef DEBUG
     assert(cell_counter[0]+cell_counter[1]==(int)cell_num);
+#endif
     fin.close();
+}
+
+void FM::preprocess(){
+    std::cout<<"Cutsize before preprocessing: "<<min_cut<<std::endl;
+    cell_counter[0] = cell_counter[1] = 0;
+    group.clear();
+    group.resize(cell_num);
+
+
+    std::set<std::pair<size_t,size_t>,std::greater<std::pair<size_t,size_t>>>s;
+    for(size_t i=0;i<net_num;++i){
+        s.insert({net_list.at(i).size(),i});
+    }
+    std::vector<bool>record;
+    record.resize(cell_num,false);
+
+    int unplaced = cell_num;
+    bool side = true;
+    for(auto it = s.begin();it!=s.end();++it){
+        size_t net_id = it->second;
+        cell_num_in_net[0][net_id] = 0;
+        cell_num_in_net[1][net_id] = 0;
+        for(size_t cell_id:net_list[net_id]){
+            if(!record[cell_id]){//unplaced cell
+                --unplaced;
+                cell_counter[side]++;
+                group[cell_id] = side;
+                record[cell_id] = true;
+                cell_num_in_net[side][net_id]++;
+                if(unplaced<=(int)cell_num/2)
+                    side = false;
+            }else{
+                cell_num_in_net[group[cell_id]][net_id]++;
+            }
+        }    
+    }
+
+#ifdef DEBUG
+    assert(cell_counter[0]>=(int)min_group&&cell_counter[1]>=(int)min_group);
+    assert(cell_counter[0]+cell_counter[1]==(int)cell_num);
+    for(size_t i=0;i<net_num;++i){
+        assert(cell_num_in_net[0][i]+cell_num_in_net[1][i]==(int)net_list[i].size());
+    }
+#endif 
+
+    cell_counter[0] = cell_num - cell_counter[1];
+    answer.clear();
+    answer = group;
+    current_cut = min_cut = getCutSize();
+    std::cout<<"Cutsize after preprocessing: "<<min_cut<<std::endl;
 }
 
 void FM::writeOutput(const std::string & file_name){
@@ -103,7 +154,9 @@ void FM::updateGain(size_t cell_id){
     bool to = !group[cell_id];
     cell_counter[from]--;
     cell_counter[to]++;
+#ifdef DEBUG
     assert(cell_counter[from]>=(int)min_group); 
+#endif 
     for(size_t net_id: cell_list[cell_id]){
         if(cell_num_in_net[to][net_id] == 0){
             for(size_t con_cell:net_list[net_id]){
@@ -154,12 +207,6 @@ void FM::updateGain(size_t cell_id){
     }
     
     group[cell_id] = !group[cell_id];
-#ifdef DEBUG
-    if(getCutSize()!=current_cut){
-        std::cerr<<"wrong!"<<std::endl;
-        exit(1);
-    }
-#endif 
     if(current_cut<min_cut){
         answer.clear();
         answer = group;
@@ -171,21 +218,17 @@ size_t FM::chooseCell(){
     size_t cell_id;
     if(bucket[0].empty()||cell_counter[0]==(int)min_group){
         cell_id = bucket[1].begin()->second;
-        assert(group[cell_id]==true);
         bucket[1].erase(bucket[1].begin());
     }else if(bucket[1].empty()||cell_counter[1]==(int)min_group){
         cell_id = bucket[0].begin()->second;
         bucket[0].erase(bucket[0].begin());
-        assert(group[cell_id]==false);
     }else{
         if(bucket[0].begin()->second>=bucket[1].begin()->second){
             cell_id = bucket[0].begin()->second;
             bucket[0].erase(bucket[0].begin());
-            assert(group[cell_id]==false);
         }else{
             cell_id = bucket[1].begin()->second;
             bucket[1].erase(bucket[1].begin());
-            assert(group[cell_id]==true);
         }
     }
     return cell_id;
@@ -245,22 +288,6 @@ void FM::run(){
 #endif 
         undoGroup();
 
-#ifdef DEBUG
-        std::vector<int>test[2];
-        test[0].resize(net_num);
-        test[1].resize(net_num);
-        for(size_t i=0;i<cell_num;++i){
-            for(size_t net_id:cell_list[i]){
-                test[group[i]][net_id]++;
-            }
-        }
-
-        for(size_t i=0;i<net_num;++i){
-            assert(test[0][i]==cell_num_in_net[0][i]&&test[1][i]==cell_num_in_net[1][i]);
-        }
-        
-        assert(getCutSize()==min_cut);
-#endif
         current_cut = min_cut;
         std::cout<<"Round "<<counter++<<" cutsize: "<<min_cut<<std::endl;
     }

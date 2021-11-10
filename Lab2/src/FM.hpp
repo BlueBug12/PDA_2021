@@ -1,6 +1,6 @@
 #ifndef FM_HPP 
 #define FM_HPP
-//#define DEBUG
+#define DEBUG
 //#define PRINTER 
 
 #include <vector>
@@ -25,6 +25,7 @@ public:
     
     void readInput(const std::string & file_name);
     void writeOutput(const std::string & file_name);
+    void preprocess();
     void initialize();//distribute cells into two groups and set the initial F T values
     void updateGain(size_t cell_id);//update net gain & cell gain
     size_t chooseCell();//choose the valid candidate with largest gain 
