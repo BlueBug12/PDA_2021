@@ -43,27 +43,27 @@ void FM::readInput(const std::string & file_name){
                 group[pseudo_id] = side;
                 cur_group = side;
                 side = !side;
+                cell_counter[cur_group]++;
+
             }else{
                 pseudo_id = key[c_id];
                 cur_group = group[pseudo_id];
             }
             cell_num_in_net[cur_group][i]++;
-            cell_counter[cur_group]++;
             net_list[i].push_back(pseudo_id);
             cell_list[pseudo_id].push_back(i);
         }
         if(net_list[i].size()==1){
             cell_num_in_net[cur_group][i]--;
-            cell_counter[cur_group]--;
+            //cell_counter[cur_group]--;
             net_list[i].clear();
             cell_list[pseudo_id].pop_back();
             
             --i;
             --net_num;
         }
-        //std::cout<<net_list[i].size()<<std::endl;
-        //assert(net_list[i].size()>1);
     }
+    assert(cell_counter[0]+cell_counter[1]==(int)cell_num);
     fin.close();
 }
 
@@ -103,7 +103,7 @@ void FM::updateGain(size_t cell_id){
     bool to = !group[cell_id];
     cell_counter[from]--;
     cell_counter[to]++;
-    
+    assert(cell_counter[from]>=(int)min_group); 
     for(size_t net_id: cell_list[cell_id]){
         if(cell_num_in_net[to][net_id] == 0){
             for(size_t con_cell:net_list[net_id]){
@@ -171,17 +171,21 @@ size_t FM::chooseCell(){
     size_t cell_id;
     if(bucket[0].empty()||cell_counter[0]==(int)min_group){
         cell_id = bucket[1].begin()->second;
+        assert(group[cell_id]==true);
         bucket[1].erase(bucket[1].begin());
     }else if(bucket[1].empty()||cell_counter[1]==(int)min_group){
         cell_id = bucket[0].begin()->second;
         bucket[0].erase(bucket[0].begin());
+        assert(group[cell_id]==false);
     }else{
         if(bucket[0].begin()->second>=bucket[1].begin()->second){
             cell_id = bucket[0].begin()->second;
             bucket[0].erase(bucket[0].begin());
+            assert(group[cell_id]==false);
         }else{
             cell_id = bucket[1].begin()->second;
             bucket[1].erase(bucket[1].begin());
+            assert(group[cell_id]==true);
         }
     }
     return cell_id;
@@ -203,11 +207,17 @@ inline int FM::getCutSize(){
 void FM::undoGroup(){
     for(size_t i=0;i<cell_num;++i){
         if(group[i]!=answer[i]){
-            for(size_t net_id:cell_list[i]){
-                if(group[i]){
+            if(group[i]){
+                cell_counter[1]--;
+                cell_counter[0]++;
+                for(size_t net_id:cell_list[i]){
                     cell_num_in_net[1][net_id]--;
                     cell_num_in_net[0][net_id]++;
-                }else{
+                }
+            }else{
+                cell_counter[1]++;
+                cell_counter[0]--;
+                for(size_t net_id:cell_list[i]){
                     cell_num_in_net[1][net_id]++;
                     cell_num_in_net[0][net_id]--;
                 }
@@ -249,8 +259,6 @@ void FM::run(){
             assert(test[0][i]==cell_num_in_net[0][i]&&test[1][i]==cell_num_in_net[1][i]);
         }
         
-        std::cout<<min_cut<<std::endl;
-        std::cout<<getCutSize()<<std::endl;
         assert(getCutSize()==min_cut);
 #endif
         current_cut = min_cut;
