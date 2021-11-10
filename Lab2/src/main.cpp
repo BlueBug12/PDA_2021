@@ -14,7 +14,7 @@ int main(int argc, char ** argv){
 
     float balance_ratio = 0.45;
     FM fm(argv[1], balance_ratio);
-    fm.preprocess2(2);
+    fm.preprocess2(4);
     fm.run();
     fm.writeOutput(out_name);
     return 0;

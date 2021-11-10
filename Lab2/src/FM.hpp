@@ -1,7 +1,7 @@
 #ifndef FM_HPP 
 #define FM_HPP
 //#define DEBUG
-#define PRINTER 
+//#define PRINTER 
 
 #include <vector>
 #include <climits>
@@ -50,7 +50,6 @@ public:
     std::vector<std::vector<size_t>> cell_list;//store the net list for each cell
     std::vector<std::vector<size_t>>set_record;
     std::vector<size_t>ds;
-
     std::vector<int>cell_num_in_net[2];
     std::vector<bool>group;
     std::vector<bool>answer;

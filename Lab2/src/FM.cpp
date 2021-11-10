@@ -65,7 +65,7 @@ void FM::readInput(const std::string & file_name){
             cell_num_in_net[cur_group][i]--;
             net_list[i].clear();
             cell_list[pseudo_id].pop_back();
-            
+            net_list.pop_back();
             --i;
             --net_num;
         }
@@ -93,9 +93,38 @@ void FM::preprocess2(size_t set_num){
 #ifdef PRINTER
     std::cout<<"Cutsize before preprocessing: "<<min_cut<<std::endl;
 #endif
+
+    //std::vector<std::vector<size_t>>edge = net_list;
+    //std::random_shuffle(edge.begin(),edge.end());
+    //for(auto & v: edge){
+    //    std::random_shuffle(v.begin(),v.end());
+    //}
     std::vector<size_t>heads;
-    size_t max_size = cell_num/set_num + 1;
+    size_t max_size = cell_num/set_num;
     for(size_t i=0;i<net_num;++i){
+        
+        size_t head = 0;
+        size_t tail = net_list[i].size()-1;
+        while(head<tail){
+            size_t c1 = collapse(net_list[i][head]);
+            size_t c2 = collapse(net_list[i][tail]);
+            if(set_record[c1].size() > max_size){
+                ++head;
+                continue;
+            }
+            if(set_record[c2].size() > max_size){
+                --tail;
+                continue;
+            }
+            if(c1==c2){
+                --tail;
+                continue;
+            }
+            merge(c1,c2);
+            --tail;
+        }
+
+        /*
         size_t ub = 1000000;
         size_t c1 = net_list[i].front();
         for(size_t cell_id:net_list[i]){
@@ -109,18 +138,17 @@ void FM::preprocess2(size_t set_num){
             size_t c2 = ds[cell_id];
             if(c1==c2)
                 continue;
-            if(c1!=c2 && set_record[c1].size()+set_record[c2].size()<=max_size){
+            if(set_record[c1].size()+set_record[c2].size()<=max_size){
                 merge(c1,c2);
             }else{
                 break;
             }
-        }
+        }*/
     }
-    size_t sum=0;
+
     for(size_t i=0;i<cell_num;++i){
         if(!set_record[i].empty()){
             heads.push_back(i);
-            sum+=set_record[i].size();
         }
     }
     
@@ -370,7 +398,9 @@ void FM::run(){
     std::cout<<"Initial cutsize:"<<current_cut<<std::endl;
 #endif
     int origin_min_cut = 1e9;
+#ifdef PRINTER
     int counter = 1;
+#endif
     while(1){
         origin_min_cut = min_cut;
         initialize();
