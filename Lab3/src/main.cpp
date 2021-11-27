@@ -12,10 +12,10 @@ int main(int argc, char **argv){
     std::string output_name = argv[4];
 
     SP sp(block_name, net_name);
+    /*
     std::vector<int>X = {3,2,0,5,1,4};
     std::vector<int>Y = {5,2,4,3,0,1};
-    sp.setInitial(X,Y);
-    sp.LCS();
+    sp.setInitial(X,Y);*/
 
     return 0;
 }

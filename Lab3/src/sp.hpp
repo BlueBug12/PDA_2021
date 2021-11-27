@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <climits>
 #include <assert.h>
 
 class SP{
@@ -19,10 +20,13 @@ public:
     ~SP() = default;
     void parser(const std::string& block_name, const std::string& net_name);
     void setInitial(const std::vector<int>& pos_loci, const std::vector<int>& neg_loci);
-    void LCS();
+    void updateBound(int net_id, int x, int y);
     int getArea();
     int getHPWL();
     float cost();
+    void op1();
+    void op2();
+    void op3();
 
 private:
     int block_num;
@@ -34,6 +38,7 @@ private:
     std::vector<int>dim[2];// 0 for width, 1 for height
     std::vector<int>pos[2];
     std::vector<std::vector<int>> nets;
+    std::vector<int>bound[4];//left,right,up,down
 
     std::vector<int>loci[2];
     std::vector<int>match[2];
