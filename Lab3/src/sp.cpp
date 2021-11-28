@@ -41,7 +41,6 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         match[0][i] = match[1][i] = i;
     }
     int w,h;
-    getArea(w,h);//initialize pos vector
 
     for(int i=0;i<block_num;++i){
         b_fin >> str;
@@ -59,6 +58,7 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         pos[1][i] = y;
     }
     b_fin.close();
+    getArea(w,h);//initialize pos vector
 
     std::ifstream n_fin{net_name};
     if(!n_fin){
@@ -85,6 +85,13 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         }
         nets.push_back(std::move(net));
     }
+    for(int i=0;i<block_num;++i){
+        std::cout<<pos[0][i]<<","<<pos[1][i]<<" ";
+    }
+    std::cout<<std::endl;
+    for(int i=0;i<net_num;++i){
+        std::cout<<bound[0][i]<<" "<<bound[1][i]<<" "<<bound[2][i]<<" "<<bound[3][i]<<std::endl;
+    }
     n_fin.close();
 }
 
@@ -96,7 +103,7 @@ void SP::updateNet(){
 
     for(int i=0;i<net_num;++i){
         for(int j=0;j<(int)nets[i].size();++j){
-            updateBound(i,j);
+            updateBound(i,nets[i][j]);
         }
     }
 }

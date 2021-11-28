@@ -2,6 +2,8 @@
 
 void SA::buildSP(const std::string block_name, const std::string net_name, double alpha){
     sp = new SP(block_name,net_name,alpha);
+
+    std::cout<<sp->getHPWL()<<std::endl;
 }
 
 
@@ -19,6 +21,7 @@ void SA::run(){
     b_width = cur_w;
     b_height = cur_h;
     b_hpwl = cur_hpwl;
+    std::cout<<"initial hpwl:"<<b_hpwl<<std::endl;
     b_area = cur_area;
 
     pos_x = sp->pos[0];
@@ -40,7 +43,11 @@ void SA::run(){
 			std::vector<int>v1 = sp->loci[0];
             sp->op2();
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
-			fout<<cur_e<<" "<<new_e<<std::endl;
+			fout<<cur_e<<" "<<new_e <<std::endl;
+            for(int i=0;i<pos_x.size();++i){
+                fout<<sp->loci[0][i]<<" ";
+            }
+            fout<<std::endl;
             if(new_e < cur_e){
                 cur_e = new_e;
                 accept_good += 1;
@@ -55,6 +62,7 @@ void SA::run(){
             }
 
             if(b_cost > cur_e){
+                std::cout<<"updated!!"<<std::endl;
                 b_cost = cur_e;
                 b_width = cur_w;
                 b_height = cur_h;
@@ -78,6 +86,8 @@ void SA::run(){
     std::cout<<"accept bad:"<<accept_bad<<std::endl;
     std::cout<<"reject bad:"<<reject_bad<<std::endl;
     std::cout<<"lowest energy:"<<b_cost<<std::endl;
+    std::cout<<"final area:"<<b_area<<std::endl;
+    std::cout<<"final hpwl:"<<b_hpwl<<std::endl;
 	fout.close();
 }
 
