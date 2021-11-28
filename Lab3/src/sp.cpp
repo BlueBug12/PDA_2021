@@ -40,9 +40,9 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         loci[0][i] = loci[1][i] = i;
         match[0][i] = match[1][i] = i;
     }
-    getArea();//initialize pos vector
-
     int w,h;
+    getArea(w,h);//initialize pos vector
+
     for(int i=0;i<block_num;++i){
         b_fin >> str;
         index_map[str] = i;
@@ -119,8 +119,7 @@ void SP::updateBound(int net_id, int pos_id){
     bound[3][net_id] = std::min(bound[3][net_id],y);//update down bound
 }
 
-int SP::getArea(){
-    int width, height;
+int SP::getArea(int & width, int & height){
     std::vector<int>lcs;
     lcs.resize(block_num,0);
     //calculate x coordinate
@@ -154,7 +153,7 @@ int SP::getArea(){
             }
         }
     }
-    height = lcs.front();
+    height = lcs.back();
     return width*height;
     /*
     for(int i=0;i<block_num;++i){
@@ -209,6 +208,9 @@ void SP::op2(){
     //std::srand(87);
     int b1 = std::rand()%block_num;
     int b2 = std::rand()%block_num;
+    while(b2==b1){
+        b2 = std::rand()%block_num;
+    }
     int pos_i1 = match[0][b1];
     int pos_i2 = match[0][b2];
     int neg_i1 = match[1][b1];
@@ -240,4 +242,11 @@ void SP::op3(){
     //std::srand(87);
     int i = std::rand()%block_num;
     std::swap(dim[0][i],dim[1][i]);
+}
+
+void SP::nameList(std::vector<std::string>&name){
+    name.resize(block_num);
+    for(auto p: index_map){
+        name[p.second] = p.first;
+    }
 }

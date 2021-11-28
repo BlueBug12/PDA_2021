@@ -21,6 +21,7 @@ int main(int argc, char **argv){
     SA sa(descet_rate,initial_t,final_t,scale,markov_iter,scale_descen_rate);
     sa.buildSP(block_name, net_name, alpha);
     sa.run();
+    sa.writeResult(output_name);
     //SP sp(block_name, net_name, alpha);
     /*
     std::vector<int>X = {3,2,0,5,1,4};

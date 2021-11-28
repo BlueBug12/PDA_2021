@@ -5,6 +5,7 @@
 #include <vector>
 #include <cmath>
 #include <random>
+#include <fstream>
 #include "sp.hpp"
 
 class SA{
@@ -29,10 +30,20 @@ public:
     void buildSP(const std::string block_name, const std::string net_name, double alpha);
     double acceptance(double old_e, double new_e, double temperature);
     void run();
+    void writeResult(const std::string& file_name);
     
     SP *sp;
-    std::vector<int>pos_loci;
-    std::vector<int>neg_loci;
+    std::vector<int>pos_x;
+    std::vector<int>pos_y;
+    std::vector<int>dim_w;
+    std::vector<int>dim_h;
+    std::vector<int>width;
+    std::vector<int>height;
+    double b_cost;
+    int b_hpwl;
+    int b_area;
+    int b_width;
+    int b_height;
 
 private:
     const double m_descent_rate;

@@ -13,8 +13,18 @@ void SA::run(){
 	std::ofstream fout{"log.txt"};
 
     double cur_t = m_initial_t;
-    double cur_e = sp->getCost();
-    double best_e = cur_e;
+    int cur_w, cur_h, cur_hpwl, cur_area;
+    double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
+    b_cost = cur_e;
+    b_width = cur_w;
+    b_height = cur_h;
+    b_hpwl = cur_hpwl;
+    b_area = cur_area;
+
+    pos_x = sp->pos[0];
+    pos_y = sp->pos[1];
+    dim_w = sp->dim[0];
+    dim_h = sp->dim[1];
 
     int accept_good = 0;
     int accept_bad = 0;
@@ -27,14 +37,15 @@ void SA::run(){
 
     while(cur_t >= m_final_t){
         for(int i=0;i<m_markov_iter;++i){
+			std::vector<int>v1 = sp->loci[0];
             sp->op2();
-            double new_e = sp->getCost();
+			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
+			fout<<cur_e<<" "<<new_e<<std::endl;
             if(new_e < cur_e){
                 cur_e = new_e;
                 accept_good += 1;
             }else{
                 double prob = acceptance(cur_e,new_e,cur_t);
-				fout<<cur_e<<" "<<new_e<<std::endl;
                 if(prob > distr(eng)){
                     cur_e = new_e;
                     accept_bad += 1;
@@ -43,11 +54,17 @@ void SA::run(){
                 }
             }
 
-            if(best_e > cur_e){
-                best_e = cur_e;
+            if(b_cost > cur_e){
+                b_cost = cur_e;
+                b_width = cur_w;
+                b_height = cur_h;
+                b_hpwl = cur_hpwl;
+                b_area = cur_area;
                 m_scale *= m_scale_descent_rate;
-                pos_loci = sp->loci[0];
-                neg_loci = sp->loci[1];
+                pos_x = sp->pos[0];
+                pos_y = sp->pos[1];
+                dim_w = sp->dim[0];
+                dim_h = sp->dim[1];
             }
         }
         if(iter%logger_iter==0){
@@ -60,6 +77,22 @@ void SA::run(){
     std::cout<<"accept good:"<<accept_good<<std::endl;
     std::cout<<"accept bad:"<<accept_bad<<std::endl;
     std::cout<<"reject bad:"<<reject_bad<<std::endl;
-    std::cout<<"lowest energy:"<<best_e<<std::endl;
+    std::cout<<"lowest energy:"<<b_cost<<std::endl;
 	fout.close();
+}
+
+void SA::writeResult(const std::string& file_name){
+    std::ofstream fout{file_name};
+    fout << b_cost <<std::endl;
+    fout << b_hpwl << std::endl;
+    fout << b_area << std::endl;
+    fout << b_width << " "<< b_height << std::endl;
+    fout << 0.87 << std::endl;
+    std::vector<std::string>name;
+    sp->nameList(name);
+    for(int i=0;i<(int)name.size();++i){
+        fout << name[i] << " " <<  pos_x[i] << " " << pos_y[i] << " " << pos_x[i]+dim_w[i] << " " << pos_y[i]+dim_h[i] <<std::endl;
+    }
+
+    fout.close();
 }

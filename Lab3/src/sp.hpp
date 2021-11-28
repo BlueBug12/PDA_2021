@@ -22,16 +22,26 @@ public:
     void setInitial(const std::vector<int>& pos_loci, const std::vector<int>& neg_loci);
     void updateBound(int net_id, int pos_id);
     void updateNet();
-    int getArea();
+    int getArea(int& width, int& height);
     int getHPWL();
-    inline double getCost(){
-        return alpha*getArea() + (1-alpha)*getHPWL();
+    inline double getCost(int& w, int& h, int& hpwl, int& area){
+        int w_,h_;
+        area = getArea(w_,h_);
+        hpwl = getHPWL();
+        w = w_;
+        h = h_;
+        return alpha*area + (1-alpha)*hpwl;
     }
     void op1();
     void op2();
     void op3();
+    void nameList(std::vector<std::string>& name);
 
     std::vector<int>loci[2];
+    std::vector<int>dim[2];// 0 for width, 1 for height
+    std::vector<int>pos[2];
+
+
 private:
     int block_num;
     int terminal_num;
@@ -40,8 +50,6 @@ private:
     int outline_h;
     const double alpha;
     std::unordered_map<std::string,int>index_map;
-    std::vector<int>dim[2];// 0 for width, 1 for height
-    std::vector<int>pos[2];
     std::vector<std::vector<int>> nets;
     std::vector<int>bound[4];//left,right,up,down
 
