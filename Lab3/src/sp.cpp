@@ -1,19 +1,7 @@
 #include "sp.hpp"
 
-SP::SP(const std::string block_name, const std::string net_name){
+SP::SP(const std::string block_name, const std::string net_name, double alpha_):alpha(alpha_){
     parser(block_name,net_name);
-
-
-    //initialize sequence pair
-    for(int i = 0 ;i<2;++i){
-        pos[i].resize(block_num);
-        match[i].resize(block_num);
-        loci[i].resize(block_num);
-    }
-    for(int i=0;i<block_num;++i){
-        loci[0][i] = loci[1][i] = i;
-        match[0][i] = match[1][i] = i;
-    }
 }
 void SP::setInitial(const std::vector<int>& pos_loci, const std::vector<int>& neg_loci){
 #ifdef DEBUG
@@ -37,18 +25,22 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
     b_fin >> str >> outline_w >> outline_h;
     b_fin >> str >> block_num;
     b_fin >> str >> terminal_num;
-    
-    bound[0].resize(net_num,INT_MAX);//initialize left bound
-    bound[1].resize(net_num,INT_MIN);//initialize right bound
-    bound[2].resize(net_num,INT_MIN);//initialize up bound
-    bound[3].resize(net_num,INT_MAX);//initialize down bound
 
     int pin_num = block_num + terminal_num;
 
-    dim[0].resize(block_num);
-    dim[1].resize(block_num);
-    pos[0].resize(pin_num);
-    pos[1].resize(pin_num);   
+    for(int i = 0 ;i<2;++i){
+        match[i].resize(block_num);
+        loci[i].resize(block_num);
+        dim[i].resize(block_num);
+        pos[i].resize(pin_num);
+    }
+
+    //initialize sequence pair
+    for(int i=0;i<block_num;++i){
+        loci[0][i] = loci[1][i] = i;
+        match[0][i] = match[1][i] = i;
+    }
+    getArea();//initialize pos vector
 
     int w,h;
     for(int i=0;i<block_num;++i){
@@ -75,6 +67,12 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
     }
 
     n_fin >> str >> net_num;
+
+    bound[0].resize(net_num,INT_MAX);//initialize left bound
+    bound[1].resize(net_num,INT_MIN);//initialize right bound
+    bound[2].resize(net_num,INT_MIN);//initialize up bound
+    bound[3].resize(net_num,INT_MAX);//initialize down bound
+
     int degree;
     for(int i=0;i<net_num;++i){
         n_fin >> str >> degree;
@@ -82,9 +80,7 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         for(int j=0;j<degree;++j){
             n_fin >> str;
             int id = index_map[str];
-            if(id>=block_num){
-                updateBound(i,pos[0][i],pos[1][i]);            
-            }
+            updateBound(i,id);            
             net.push_back(id);       
         }
         nets.push_back(std::move(net));
@@ -92,7 +88,31 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
     n_fin.close();
 }
 
-void SP::updateBound(int net_id, int x, int y){
+void SP::updateNet(){
+    bound[0].resize(net_num,INT_MAX);//initialize left bound
+    bound[1].resize(net_num,INT_MIN);//initialize right bound
+    bound[2].resize(net_num,INT_MIN);//initialize up bound
+    bound[3].resize(net_num,INT_MAX);//initialize down bound
+
+    for(int i=0;i<net_num;++i){
+        for(int j=0;j<(int)nets[i].size();++j){
+            updateBound(i,j);
+        }
+    }
+}
+
+void SP::updateBound(int net_id, int pos_id){
+#ifdef DEBUG
+    assert(net_id<net_num);
+    assert(pos_id<block_num+terminal_num);
+#endif 
+    int x = pos[0][pos_id];
+    int y = pos[1][pos_id];
+    if(pos_id < block_num){
+        x += dim[0][pos_id]/2;
+        y += dim[1][pos_id]/2;
+    }
+
     bound[0][net_id] = std::min(bound[0][net_id],x);//update left bound
     bound[1][net_id] = std::max(bound[1][net_id],x);//update right bound
     bound[2][net_id] = std::max(bound[2][net_id],y);//update up bound
@@ -149,6 +169,7 @@ int SP::getArea(){
 }
 
 int SP::getHPWL(){
+    updateNet();
     int hpwl = 0;
     for(int i=0;i<net_num;++i){
 #ifdef DEBUG
@@ -163,9 +184,13 @@ int SP::getHPWL(){
     }
     return hpwl;
 }
+/*
+inline double SP::getCost(){
+    return alpha*getArea() + (1-alpha)*getHPWL();
+}*/
 
 void SP::op1(){
-    std::srand(87);
+    //std::srand(87);
     int x1 = std::rand()%block_num;
     int x2 = std::rand()%block_num;
     match[0][loci[0][x1]] = x2;
@@ -174,24 +199,45 @@ void SP::op1(){
 }
 
 void SP::op2(){
-    std::srand(87);
+    /*
+    for(int a=0;a<2;++a){
+        for(int i=0;i<block_num;++i){
+            std::cout<<loci[0][i]<<" ";
+        }
+        std::cout<<std::endl;
+    }*/
+    //std::srand(87);
     int b1 = std::rand()%block_num;
     int b2 = std::rand()%block_num;
     int pos_i1 = match[0][b1];
     int pos_i2 = match[0][b2];
     int neg_i1 = match[1][b1];
     int neg_i2 = match[1][b2];
-
-   match[0][loci[0][pos_i1]] = pos_i2;
-   match[0][loci[0][pos_i2]] = pos_i1;
-   match[1][loci[1][neg_i1]] = neg_i2;
-   match[1][loci[1][neg_i2]] = neg_i1;
+    
+    match[0][loci[0][pos_i1]] = pos_i2;
+    match[0][loci[0][pos_i2]] = pos_i1;
+    match[1][loci[1][neg_i1]] = neg_i2;
+    match[1][loci[1][neg_i2]] = neg_i1;
 
    std::swap(loci[0][pos_i1],loci[0][pos_i2]);
    std::swap(loci[1][neg_i1],loci[1][neg_i2]);
+
+   /*
+    for(int a=0;a<2;++a){
+        for(int i=0;i<block_num;++i){
+            std::cout<<loci[a][i]<<" ";
+        }
+        std::cout<<std::endl;
+        for(int i=0;i<block_num;++i){
+            std::cout<<match[a][i]<<" ";
+        }
+        std::cout<<std::endl;
+        std::cout<<std::endl;
+    }
+    exit(1);*/
 }
 void SP::op3(){
-    std::srand(87);
+    //std::srand(87);
     int i = std::rand()%block_num;
     std::swap(dim[0][i],dim[1][i]);
 }
