@@ -6,7 +6,7 @@ void SA::buildSP(const std::string block_name, const std::string net_name, doubl
 
 
 double SA::acceptance(double old_e, double new_e, double temperature){
-    return std::exp((old_e - new_e)/temperature); 
+    return std::exp((old_e - new_e)/(temperature*0.1)); 
 }
 
 void SA::run(){
@@ -40,7 +40,15 @@ void SA::run(){
 
     while(cur_t >= m_final_t){
         for(int i=0;i<m_markov_iter;++i){
-            sp->op1();
+            int r = std::rand()%100;
+            if(r<35){
+                sp->op3();
+            }
+            if(r<50){
+                sp->op2();
+            }else{
+                sp->op1();
+            }
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
 			fout<<cur_e<<" "<<new_e <<std::endl;
             for(int i=0;i<pos_x.size();++i){

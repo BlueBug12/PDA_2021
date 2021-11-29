@@ -178,9 +178,13 @@ int SP::getHPWL(){
 void SP::op1(){
     int x1 = std::rand()%block_num;
     int x2 = std::rand()%block_num;
-    match[0][loci[0][x1]] = x2;
-    match[0][loci[0][x2]] = x1;
-    std::swap(loci[0][x1],loci[0][x2]);
+    while(x2==x1){
+        x2 = std::rand()%block_num;
+    }
+    int index = std::rand()%2;
+    match[index][loci[index][x1]] = x2;
+    match[index][loci[index][x2]] = x1;
+    std::swap(loci[index][x1],loci[index][x2]);
 }
 
 void SP::op2(){
