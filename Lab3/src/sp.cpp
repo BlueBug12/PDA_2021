@@ -3,15 +3,17 @@
 SP::SP(const std::string block_name, const std::string net_name, double alpha_):alpha(alpha_){
     parser(block_name,net_name);
 }
-void SP::setInitial(const std::vector<int>& pos_loci, const std::vector<int>& neg_loci){
-#ifdef DEBUG
-    assert((int)pos_loci.size()==block_num && (int)neg_loci.size()==block_num);
-#endif
-    for(int i = 0;i<block_num;++i){
-        loci[0][i] = pos_loci[i];
-        loci[1][i] = neg_loci[i];
-        match[0][pos_loci[i]] = i;
-        match[1][neg_loci[i]] = i;
+void SP::setInitial(){
+    for(int i=0;i<2;++i){
+        for(int j = 0;j<block_num;++j){
+            loci[i][j] = j;
+        }
+    }
+    for(int i = 0;i<2;++i){
+        std::random_shuffle(loci[i].begin(),loci[i].end());
+        for(int j=0;j<block_num;++j){
+            match[i][loci[i][j]] = j;
+        }
     }
 }
 
@@ -36,10 +38,12 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
     }
 
     //initialize sequence pair
+    setInitial();
+    /*
     for(int i=0;i<block_num;++i){
         loci[0][i] = loci[1][i] = i;
         match[0][i] = match[1][i] = i;
-    }
+    }*/
 
     int w,h;
     for(int i=0;i<block_num;++i){
@@ -82,7 +86,6 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
         for(int j=0;j<degree;++j){
             n_fin >> str;
             int id = index_map[str];
-            //updateBound(i,id);            
             net.push_back(id);       
         }
         nets.push_back(std::move(net));

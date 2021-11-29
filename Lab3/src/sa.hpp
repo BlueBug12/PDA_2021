@@ -37,8 +37,8 @@ public:
     std::vector<int>pos_y;
     std::vector<int>dim_w;
     std::vector<int>dim_h;
-    std::vector<int>width;
-    std::vector<int>height;
+    std::vector<int>pos_loci;
+    std::vector<int>neg_loci;
     double b_cost;
     int b_hpwl;
     int b_area;

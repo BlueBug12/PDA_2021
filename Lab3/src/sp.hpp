@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <climits>
@@ -19,7 +20,7 @@ public:
     SP & operator=(SP      &&) = delete;
     ~SP() = default;
     void parser(const std::string& block_name, const std::string& net_name);
-    void setInitial(const std::vector<int>& pos_loci, const std::vector<int>& neg_loci);
+    void setInitial();
     void updateBound(int net_id, int pos_id);
     void updateNet();
     int getArea(int& width, int& height);

@@ -27,10 +27,10 @@ int main(int argc, char **argv){
     }
     
     double descet_rate = 0.99;
-    double initial_t = 100000000.0;
+    double initial_t = 1000000.0;
     double final_t = 1.0;
     double scale = 0.8;
-    int markov_iter = 10000;
+    int markov_iter = 1000;
     double scale_descen_rate = 0.99;
 
     SA sa(descet_rate,initial_t,final_t,scale,markov_iter,scale_descen_rate);

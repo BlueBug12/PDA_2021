@@ -6,11 +6,11 @@ void SA::buildSP(const std::string block_name, const std::string net_name, doubl
 
 
 double SA::acceptance(double old_e, double new_e, double temperature){
-    return std::exp((old_e - new_e)/(temperature*0.1)); 
+    //return std::exp((old_e - new_e)/(10000000)); 
+    return std::exp((old_e - new_e)/(temperature*10)); 
 }
 
 void SA::run(){
-	std::ofstream fout{"log.txt"};
 
     double cur_t = m_initial_t;
     int cur_w, cur_h, cur_hpwl, cur_area;
@@ -32,12 +32,15 @@ void SA::run(){
     int accept_good = 0;
     int accept_bad = 0;
     int reject_bad = 0;
+    int local_ag = 0;
+    int local_ab = 0;
+    int local_rb = 0;
     int iter = 0;
     int logger_iter = 100;
+    int better =0;
     std::random_device rd;
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0, 1);
-
     while(cur_t >= m_final_t){
         for(int i=0;i<m_markov_iter;++i){
             int r = std::rand()%100;
@@ -50,21 +53,16 @@ void SA::run(){
                 sp->op1();
             }
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
-			fout<<cur_e<<" "<<new_e <<std::endl;
-            for(int i=0;i<pos_x.size();++i){
-                fout<<sp->loci[0][i]<<" ";
-            }
-            fout<<std::endl;
             if(new_e < cur_e){
                 cur_e = new_e;
-                accept_good += 1;
+                local_ag += 1;
             }else{
                 double prob = acceptance(cur_e,new_e,cur_t);
                 if(prob > distr(eng)){
                     cur_e = new_e;
-                    accept_bad += 1;
+                    local_ab += 1;
                 }else{
-                    reject_bad += 1;
+                    local_rb += 1;
                 }
             }
 
@@ -79,10 +77,26 @@ void SA::run(){
                 pos_y = sp->pos[1];
                 dim_w = sp->dim[0];
                 dim_h = sp->dim[1];
+                pos_loci = sp->loci[0];
+                neg_loci = sp->loci[1];
+                better++;
             }
         }
+
         if(iter%logger_iter==0){
+            int den = local_ag + local_ab + local_rb;
             std::cout<<"Iteration "<<iter<<": cost = "<<cur_e<<std::endl;
+            std::cout<<"find betters: "<<better<<std::endl;
+            std::cout<<"accept good rate:"<<(double)local_ag/den<<std::endl;
+            std::cout<<"accept bad rate:"<<(double)local_ab/den<<std::endl;
+            std::cout<<"reject bad rate:"<<(double)local_rb/den<<std::endl<<std::endl;
+            accept_good += local_ag;
+            accept_bad += local_ab;
+            reject_bad += local_rb;
+            local_ag = 0;
+            local_ab = 0;
+            local_rb = 0;
+            better = 0;
         }
         ++iter;
         cur_t *= m_descent_rate;
@@ -94,7 +108,6 @@ void SA::run(){
     std::cout<<"lowest energy:"<<b_cost<<std::endl;
     std::cout<<"final area:"<<b_area<<std::endl;
     std::cout<<"final hpwl:"<<b_hpwl<<std::endl;
-	fout.close();
 }
 
 void SA::writeResult(const std::string& file_name){
