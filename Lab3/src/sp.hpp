@@ -41,13 +41,14 @@ public:
     std::vector<int>dim[2];// 0 for width, 1 for height
     std::vector<int>pos[2];
 
-
-private:
     int block_num;
     int terminal_num;
     int net_num;
     int outline_w;
     int outline_h;
+
+
+private:
     const double alpha;
     std::unordered_map<std::string,int>index_map;
     std::vector<std::vector<int>> nets;
