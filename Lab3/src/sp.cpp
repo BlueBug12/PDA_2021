@@ -70,6 +70,11 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
 
     n_fin >> str >> net_num;
 
+    bound[0].resize(net_num,INT_MAX);//initialize left bound
+    bound[1].resize(net_num,INT_MIN);//initialize right bound
+    bound[2].resize(net_num,INT_MIN);//initialize up bound
+    bound[3].resize(net_num,INT_MAX);//initialize down bound
+
     int degree;
     for(int i=0;i<net_num;++i){
         n_fin >> str >> degree;
@@ -86,14 +91,10 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
 }
 
 void SP::updateNet(){
-    for(int i=0;i<4;++i){
-        bound[i].clear();
-    }
-    bound[0].resize(net_num,INT_MAX);//initialize left bound
-    bound[1].resize(net_num,INT_MIN);//initialize right bound
-    bound[2].resize(net_num,INT_MIN);//initialize up bound
-    bound[3].resize(net_num,INT_MAX);//initialize down bound
-
+    std::fill(bound[0].begin(),bound[0].end(),INT_MAX);
+    std::fill(bound[1].begin(),bound[1].end(),INT_MIN);
+    std::fill(bound[2].begin(),bound[2].end(),INT_MIN);
+    std::fill(bound[3].begin(),bound[3].end(),INT_MAX);
     for(int i=0;i<net_num;++i){
         for(int j=0;j<(int)nets[i].size();++j){
             updateBound(i,nets[i][j]);

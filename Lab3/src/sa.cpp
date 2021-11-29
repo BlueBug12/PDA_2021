@@ -96,7 +96,7 @@ void SA::writeResult(const std::string& file_name){
         exit(1);
     }
 
-    fout << b_cost <<std::endl;
+    fout << (int)b_cost <<std::endl;
     fout << b_hpwl << std::endl;
     fout << b_area << std::endl;
     fout << b_width << " "<< b_height << std::endl;
