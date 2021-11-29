@@ -40,8 +40,7 @@ void SA::run(){
 
     while(cur_t >= m_final_t){
         for(int i=0;i<m_markov_iter;++i){
-			std::vector<int>v1 = sp->loci[0];
-            sp->op3();
+            sp->op1();
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
 			fout<<cur_e<<" "<<new_e <<std::endl;
             for(int i=0;i<pos_x.size();++i){
@@ -62,7 +61,6 @@ void SA::run(){
             }
 
             if(b_cost > cur_e){
-                std::cout<<"updated!!"<<std::endl;
                 b_cost = cur_e;
                 b_width = cur_w;
                 b_height = cur_h;
