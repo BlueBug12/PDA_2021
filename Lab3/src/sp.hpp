@@ -1,9 +1,9 @@
 #ifndef SP_HPP
 #define SA_HPP
-#define DEBUG
-
+//#define DEBUG
 #include <vector>
 #include <unordered_map>
+#include <random>
 #include <algorithm>
 #include <fstream>
 #include <iostream>

@@ -4,13 +4,15 @@ SP::SP(const std::string block_name, const std::string net_name, double alpha_):
     parser(block_name,net_name);
 }
 void SP::setInitial(){
+    std::random_device rd;
+    std::mt19937 eng(rd());
     for(int i=0;i<2;++i){
         for(int j = 0;j<block_num;++j){
             loci[i][j] = j;
         }
     }
     for(int i = 0;i<2;++i){
-        std::random_shuffle(loci[i].begin(),loci[i].end());
+        std::shuffle(loci[i].begin(),loci[i].end(),eng);
         for(int j=0;j<block_num;++j){
             match[i][loci[i][j]] = j;
         }
@@ -32,18 +34,13 @@ void SP::parser(const std::string& block_name, const std::string& net_name){
 
     for(int i = 0 ;i<2;++i){
         match[i].resize(block_num);
-        loci[i].resize(block_num);
         dim[i].resize(block_num);
+        loci[i].resize(block_num);
         pos[i].resize(pin_num);
     }
 
     //initialize sequence pair
     setInitial();
-    /*
-    for(int i=0;i<block_num;++i){
-        loci[0][i] = loci[1][i] = i;
-        match[0][i] = match[1][i] = i;
-    }*/
 
     int w,h;
     for(int i=0;i<block_num;++i){
