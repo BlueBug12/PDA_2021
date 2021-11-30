@@ -10,11 +10,29 @@ double SA::acceptance(double old_e, double new_e, double temperature){
     return std::exp((old_e - new_e)/(temperature)); 
 }
 
+double skew(int w, int h,int o_w,int o_h){
+    double r = (double)(w*o_h) / (double)(h*o_w);
+    if(r < 1)
+        r = 1/r;
+    if(w>o_w){
+        r*=1.1;
+    }
+    if(h>o_h){
+        r*=1.1;
+    }
+    if(w<=o_w && h <= o_h){
+        r*=0.8;
+    }
+    return r;
+}
+
 void SA::run(){
 
     double cur_t = m_initial_t;
     int cur_w, cur_h, cur_hpwl, cur_area;
     double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
+    b_origin_cost = cur_e;
+    cur_e *= skew(cur_w,cur_h,sp->outline_w,sp->outline_h);
     b_cost = cur_e;
     b_width = cur_w;
     b_height = cur_h;
@@ -22,7 +40,7 @@ void SA::run(){
     b_area = cur_area;
     std::cout<<"initial hpwl:"<<b_hpwl<<std::endl;
     std::cout<<"initial area:"<<b_area<<std::endl;
-    std::cout<<"initial cost:"<<b_cost<<std::endl;
+    std::cout<<"initial cost:"<<b_origin_cost<<std::endl;
 
     pos_x = sp->pos[0];
     pos_y = sp->pos[1];
@@ -39,6 +57,7 @@ void SA::run(){
     int logger_iter = 100;
     int better =0;
     double reject_rate = 0.0;
+    double origin_e;
     std::random_device rd;
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0, 1);
@@ -63,7 +82,8 @@ void SA::run(){
             }else{
                 sp->op1();
             }*/
-			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
+			origin_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
+            double new_e = origin_e*skew(cur_w,cur_h,sp->outline_w,sp->outline_h);
             if(new_e < cur_e){
                 cur_e = new_e;
                 local_ag += 1;
@@ -80,24 +100,22 @@ void SA::run(){
 
             if(b_cost > cur_e){
                 b_cost = cur_e;
+                b_origin_cost = origin_e;
                 b_width = cur_w;
                 b_height = cur_h;
                 b_hpwl = cur_hpwl;
                 b_area = cur_area;
-                m_scale *= m_scale_descent_rate;
                 pos_x = sp->pos[0];
                 pos_y = sp->pos[1];
                 dim_w = sp->dim[0];
                 dim_h = sp->dim[1];
-                pos_loci = sp->loci[0];
-                neg_loci = sp->loci[1];
                 better++;
             }
         }
 
         if(iter%logger_iter==0){
             int den = local_ag + local_ab + local_rb;
-            std::cout<<"Iteration "<<iter<<": cost = "<<cur_e<<std::endl;
+            std::cout<<"Iteration "<<iter<<": cost = "<<origin_e<<std::endl;
             std::cout<<"find betters: "<<better<<std::endl;
             std::cout<<"accept good rate:"<<(double)local_ag/den<<std::endl;
             std::cout<<"accept bad rate:"<<(double)local_ab/den<<std::endl;
@@ -120,7 +138,7 @@ void SA::run(){
     std::cout<<"accept good:"<<accept_good<<std::endl;
     std::cout<<"accept bad:"<<accept_bad<<std::endl;
     std::cout<<"reject bad:"<<reject_bad<<std::endl;
-    std::cout<<"lowest energy:"<<b_cost<<std::endl;
+    std::cout<<"lowest energy:"<<b_origin_cost<<std::endl;
     std::cout<<"final area:"<<b_area<<std::endl;
     std::cout<<"final hpwl:"<<b_hpwl<<std::endl;
 }
@@ -132,7 +150,7 @@ void SA::writeResult(const std::string& file_name){
         exit(1);
     }
 
-    fout << (int)b_cost <<std::endl;
+    fout << (int)b_origin_cost <<std::endl;
     fout << b_hpwl << std::endl;
     fout << b_area << std::endl;
     fout << b_width << " "<< b_height << std::endl;
