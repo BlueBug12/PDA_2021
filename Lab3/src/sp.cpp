@@ -185,9 +185,12 @@ void SP::op1(){
         x2 = std::rand()%block_num;
     }
     int index = std::rand()%2;
-    match[index][loci[index][x1]] = x2;
-    match[index][loci[index][x2]] = x1;
+    std::swap(match[index][loci[index][x1]],match[index][loci[index][x2]]);
     std::swap(loci[index][x1],loci[index][x2]);
+    op_record[0] = x1;
+    op_record[1] = x2;
+    op_record[2] = index;
+    option = 1;
 }
 
 void SP::op2(){
@@ -201,17 +204,20 @@ void SP::op2(){
     int neg_i1 = match[1][b1];
     int neg_i2 = match[1][b2];
     
-    match[0][loci[0][pos_i1]] = pos_i2;
-    match[0][loci[0][pos_i2]] = pos_i1;
-    match[1][loci[1][neg_i1]] = neg_i2;
-    match[1][loci[1][neg_i2]] = neg_i1;
+    std::swap(match[0][b1],match[0][b2]);
+    std::swap(match[1][b1],match[1][b2]);
 
    std::swap(loci[0][pos_i1],loci[0][pos_i2]);
    std::swap(loci[1][neg_i1],loci[1][neg_i2]);
+   op_record[0] = b1;
+   op_record[1] = b2;
+   option = 2;
 }
 void SP::op3(){
     int i = std::rand()%block_num;
     std::swap(dim[0][i],dim[1][i]);
+    op_record[0] = i;
+    option = 3;
 }
 
 void SP::nameList(std::vector<std::string>&name){
@@ -219,5 +225,33 @@ void SP::nameList(std::vector<std::string>&name){
     for(auto p: index_map){
         if(p.second<block_num)
             name[p.second] = p.first;
+    }
+}
+
+void SP::reverse(){
+    //loci dim match
+    if(option==1){
+        int x1 = op_record[0];   
+        int x2 = op_record[1];
+        int index = op_record[2];
+        std::swap(loci[index][x1],loci[index][x2]);
+        std::swap(match[index][loci[index][x1]],match[index][loci[index][x2]]);
+    }else if(option==2){
+        int b1 = op_record[0]; 
+        int b2 = op_record[1];
+        int pos_i1 = match[0][b1];
+        int pos_i2 = match[0][b2];
+        int neg_i1 = match[1][b1];
+        int neg_i2 = match[1][b2];
+
+        std::swap(match[0][b1],match[0][b2]);
+        std::swap(match[1][b1],match[1][b2]);
+        std::swap(loci[0][pos_i1],loci[0][pos_i2]);
+        std::swap(loci[1][neg_i1],loci[1][neg_i2]);
+
+    }else if(option==3){
+        std::swap(dim[0][op_record[0]],dim[1][op_record[0]]);
+    }else{
+        std::cerr<<"Error: unexcepted option."<<std::endl;
     }
 }

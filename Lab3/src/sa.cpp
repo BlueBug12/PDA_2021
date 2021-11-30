@@ -7,7 +7,7 @@ void SA::buildSP(const std::string block_name, const std::string net_name, doubl
 
 double SA::acceptance(double old_e, double new_e, double temperature){
     //return std::exp((old_e - new_e)/(10000000)); 
-    return std::exp((old_e - new_e)/(temperature*10)); 
+    return std::exp((old_e - new_e)/(temperature)); 
 }
 
 void SA::run(){
@@ -38,11 +38,22 @@ void SA::run(){
     int iter = 0;
     int logger_iter = 100;
     int better =0;
+    double reject_rate = 0.0;
     std::random_device rd;
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0, 1);
-    while(cur_t >= m_final_t){
+    std::uniform_int_distribution<> dis(1,3);
+    while(reject_rate <= 0.95){
         for(int i=0;i<m_markov_iter;++i){
+            int option = dis(eng);
+            if(option==1){
+                sp->op1();
+            }else if(option==2){
+                sp->op2();
+            }else{
+                sp->op3();
+            }
+            /*
             int r = std::rand()%100;
             if(r<35){
                 sp->op3();
@@ -51,7 +62,7 @@ void SA::run(){
                 sp->op2();
             }else{
                 sp->op1();
-            }
+            }*/
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
             if(new_e < cur_e){
                 cur_e = new_e;
@@ -62,6 +73,7 @@ void SA::run(){
                     cur_e = new_e;
                     local_ab += 1;
                 }else{
+                    sp->reverse();
                     local_rb += 1;
                 }
             }
@@ -89,7 +101,10 @@ void SA::run(){
             std::cout<<"find betters: "<<better<<std::endl;
             std::cout<<"accept good rate:"<<(double)local_ag/den<<std::endl;
             std::cout<<"accept bad rate:"<<(double)local_ab/den<<std::endl;
-            std::cout<<"reject bad rate:"<<(double)local_rb/den<<std::endl<<std::endl;
+            std::cout<<"reject bad rate:"<<(double)local_rb/den<<std::endl;
+            std::cout<<"width:"<<b_width<<std::endl;
+            std::cout<<"height:"<<b_height<<std::endl<<std::endl;;
+            reject_rate = (double)local_rb/den;
             accept_good += local_ag;
             accept_bad += local_ab;
             reject_bad += local_rb;

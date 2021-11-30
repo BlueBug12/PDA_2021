@@ -37,6 +37,7 @@ public:
     void op2();
     void op3();
     void nameList(std::vector<std::string>& name);
+    void reverse();
 
     std::vector<int>loci[2];
     std::vector<int>dim[2];// 0 for width, 1 for height
@@ -54,8 +55,9 @@ private:
     std::unordered_map<std::string,int>index_map;
     std::vector<std::vector<int>> nets;
     std::vector<int>bound[4];//left,right,up,down
-
     std::vector<int>match[2];
+    int op_record[3];//x1, x2, index
+    int option;
 };
 
 #endif
