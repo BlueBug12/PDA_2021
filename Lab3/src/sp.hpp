@@ -23,16 +23,10 @@ public:
     void setInitial();
     void updateBound(int net_id, int pos_id);
     void updateNet();
+    double skew(int w,int h);
     int getArea(int& width, int& height);
     int getHPWL();
-    inline double getCost(int& w, int& h, int& hpwl, int& area){
-        int w_,h_;
-        area = getArea(w_,h_);
-        hpwl = getHPWL();
-        w = w_;
-        h = h_;
-        return alpha*area + (1-alpha)*hpwl;
-    }
+    double getCost(int& w, int& h, int& hpwl, int& area, int& origin_cost);
     void op1();
     void op2();
     void op3();
@@ -52,6 +46,7 @@ public:
 
 private:
     const double alpha;
+    double bounded_alpha;
     std::unordered_map<std::string,int>index_map;
     std::vector<std::vector<int>> nets;
     std::vector<int>bound[4];//left,right,up,down

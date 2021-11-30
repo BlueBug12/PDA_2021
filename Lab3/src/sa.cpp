@@ -11,30 +11,14 @@ double SA::acceptance(double old_e, double new_e, double temperature){
     return std::exp((old_e - new_e)/(temperature)); 
 }
 
-double skew(int w, int h,int o_w,int o_h){
-    double r = (double)(w*o_h) / (double)(h*o_w);
-    if(r < 1)
-        r = 1/r;
-    if(w>o_w){
-        r*=1.1;
-    }
-    if(h>o_h){
-        r*=1.1;
-    }
-    if(w<=o_w && h <= o_h){
-        r*=0.8;
-    }
-    return r;
-}
 
 void SA::run(){
 
     double cur_t = m_initial_t;
-    int cur_w, cur_h, cur_hpwl, cur_area;
-    double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
-    b_origin_cost = cur_e;
-    cur_e *= skew(cur_w,cur_h,sp->outline_w,sp->outline_h);
-    b_cost = cur_e;
+    int cur_w, cur_h, cur_hpwl, cur_area, ori_temp;;
+    double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
+    b_cost = DBL_MAX;
+    b_origin_cost = ori_temp;
     b_width = cur_w;
     b_height = cur_h;
     b_hpwl = cur_hpwl;
@@ -58,7 +42,7 @@ void SA::run(){
     int local_rb = 0;
     int iter = 0;
     double reject_rate = 0.0;
-    double origin_e;
+    double origin_e = DBL_MAX;
     std::random_device rd;
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0, 1);
@@ -73,8 +57,8 @@ void SA::run(){
             }else{
                 sp->op3();
             }
-			origin_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area);
-            double new_e = origin_e*skew(cur_w,cur_h,sp->outline_w,sp->outline_h);
+			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
+            origin_e = ori_temp;
             if(new_e < cur_e){
                 cur_e = new_e;
                 local_ag += 1;
@@ -169,6 +153,10 @@ void SA::writeResult(const std::string& file_name){
     fout << 0.87 << std::endl;
     std::vector<std::string>name;
     sp->nameList(name);
+    /*
+#ifdef DEBUG
+    assert(name.size()==global_pos_x.size());
+#endif*/
     for(int i=0;i<(int)name.size();++i){
         fout << name[i] << " " <<  global_pos_x[i] << " " << global_pos_y[i] << " " << global_pos_x[i]+global_dim_w[i] << " " << global_pos_y[i]+global_dim_h[i] <<std::endl;
     }

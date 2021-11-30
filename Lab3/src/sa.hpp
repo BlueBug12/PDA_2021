@@ -1,6 +1,7 @@
 #ifndef SA_HPP
 #define SA_HPP
 #define DISPLAY
+#define DEBUG
 //#define VERBOSE
 #include <iostream>
 #include <vector>
@@ -24,6 +25,7 @@ public:
         global_height = INT_MAX;
         sp = nullptr;
         pass = false;
+        b_origin_cost = DBL_MAX;
     }
     SA() = delete;
     ~SA(){

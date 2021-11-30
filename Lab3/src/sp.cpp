@@ -1,6 +1,7 @@
 #include "sp.hpp"
 
 SP::SP(const std::string block_name, const std::string net_name, double alpha_):alpha(alpha_){
+    bounded_alpha = std::max(0.1,alpha);
     parser(block_name,net_name);
 }
 void SP::setInitial(){
@@ -118,6 +119,31 @@ void SP::updateBound(int net_id, int pos_id){
     bound[1][net_id] = std::max(bound[1][net_id],x);//update right bound
     bound[2][net_id] = std::max(bound[2][net_id],y);//update up bound
     bound[3][net_id] = std::min(bound[3][net_id],y);//update down bound
+}
+
+double SP::skew(int w, int h){
+    double r = (double)(w*outline_h) / (double)(h*outline_w);
+    if(r < 1)
+        r = 1/r;
+    if(w>outline_w){
+        r*=1.1;
+    }
+    if(h>outline_h){
+        r*=1.1;
+    }
+    if(w<=outline_w && h <= outline_h){
+        r*=0.8;
+    }
+    return r;
+}
+double SP::getCost(int& w, int& h, int& hpwl, int& area, int& origin_cost){
+    int w_,h_;
+    area = getArea(w_,h_);
+    hpwl = getHPWL();
+    w = w_;
+    h = h_;
+    origin_cost = alpha*area + (1-alpha)*hpwl;
+    return skew(w,h)*bounded_alpha*area + (1-bounded_alpha)*hpwl;
 }
 
 int SP::getArea(int & width, int & height){
