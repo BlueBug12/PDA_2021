@@ -16,7 +16,7 @@ void SA::run(){
 
     double cur_t = m_initial_t;
     int cur_w, cur_h, cur_hpwl, cur_area;
-    double ori_temp;
+    int ori_temp;
     double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
     b_cost = cur_e;
     b_origin_cost = ori_temp;
@@ -149,7 +149,7 @@ void SA::writeResult(const std::string& file_name){
         exit(1);
     }
 
-    fout << (int)global_cost <<std::endl;
+    fout << global_cost <<std::endl;
     fout << global_hpwl << std::endl;
     fout << global_area << std::endl;
     fout << global_width << " "<< global_height << std::endl;

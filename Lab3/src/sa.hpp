@@ -18,14 +18,13 @@ public:
     m_initial_t(initial_t),
     m_final_t(final_t),
     m_markov_iter(markov_iter){
-        global_cost = DBL_MAX;
+        global_cost = INT_MAX;
         global_hpwl = INT_MAX;
         global_area = INT_MAX;
         global_width = INT_MAX;
         global_height = INT_MAX;
         sp = nullptr;
         pass = false;
-        b_origin_cost = DBL_MAX;
     }
     SA() = delete;
     ~SA(){
@@ -49,13 +48,13 @@ public:
     std::vector<int>dim_w;
     std::vector<int>dim_h;
     double b_cost;
-    double b_origin_cost;
+    int b_origin_cost;
     int b_hpwl;
     int b_area;
     int b_width;
     int b_height;
     bool pass;
-    double global_cost;
+    int global_cost;
     int global_hpwl;
     int global_area;
     int global_width;
