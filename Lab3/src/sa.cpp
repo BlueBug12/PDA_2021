@@ -15,24 +15,24 @@ double SA::acceptance(double old_e, double new_e, double temperature){
 void SA::run(){
 
     double cur_t = m_initial_t;
-    int cur_w, cur_h, cur_hpwl, cur_area, ori_temp;;
+    int cur_w, cur_h, cur_hpwl, cur_area, ori_temp;
     double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
-    b_cost = DBL_MAX;
+    b_cost = cur_e;
     b_origin_cost = ori_temp;
     b_width = cur_w;
     b_height = cur_h;
     b_hpwl = cur_hpwl;
     b_area = cur_area;
+    pos_x = sp->pos[0];
+    pos_y = sp->pos[1];
+    dim_w = sp->dim[0];
+    dim_h = sp->dim[1];
 
 #ifdef VERBOSE
     std::cout<<"initial hpwl:"<<b_hpwl<<std::endl;
     std::cout<<"initial area:"<<b_area<<std::endl;
     std::cout<<"initial cost:"<<b_origin_cost<<std::endl;
 #endif
-    pos_x = sp->pos[0];
-    pos_y = sp->pos[1];
-    dim_w = sp->dim[0];
-    dim_h = sp->dim[1];
 
     int accept_good = 0;
     int accept_bad = 0;
@@ -42,7 +42,6 @@ void SA::run(){
     int local_rb = 0;
     int iter = 0;
     double reject_rate = 0.0;
-    double origin_e = DBL_MAX;
     std::random_device rd;
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0, 1);
@@ -58,7 +57,6 @@ void SA::run(){
                 sp->op3();
             }
 			double new_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
-            origin_e = ori_temp;
             if(new_e < cur_e){
                 cur_e = new_e;
                 local_ag += 1;
@@ -75,7 +73,7 @@ void SA::run(){
 
             if(b_cost > cur_e){
                 b_cost = cur_e;
-                b_origin_cost = origin_e;
+                b_origin_cost = ori_temp;
                 b_width = cur_w;
                 b_height = cur_h;
                 b_hpwl = cur_hpwl;
@@ -135,6 +133,10 @@ void SA::updateResult(){
         global_area = b_area;
         global_width = b_width;
         global_height = b_height;
+#ifdef DEBUG
+        assert(sp->block_num+sp->terminal_num==(int)global_pos_x.size());
+        assert(sp->block_num==(int)global_dim_w.size());
+#endif
     }
     pass = false;
 }
@@ -153,10 +155,10 @@ void SA::writeResult(const std::string& file_name){
     fout << 0.87 << std::endl;
     std::vector<std::string>name;
     sp->nameList(name);
-    /*
+    
 #ifdef DEBUG
-    assert(name.size()==global_pos_x.size());
-#endif*/
+    assert(sp->block_num+sp->terminal_num==(int)global_pos_x.size());
+#endif
     for(int i=0;i<(int)name.size();++i){
         fout << name[i] << " " <<  global_pos_x[i] << " " << global_pos_y[i] << " " << global_pos_x[i]+global_dim_w[i] << " " << global_pos_y[i]+global_dim_h[i] <<std::endl;
     }
