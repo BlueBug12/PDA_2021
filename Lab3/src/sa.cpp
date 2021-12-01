@@ -142,7 +142,7 @@ void SA::updateResult(){
     pass = false;
 }
 
-void SA::writeResult(const std::string& file_name){
+void SA::writeResult(const std::string& file_name, float time){
     std::ofstream fout{file_name};
     if(!fout){
         std::cerr << "Error: can not open file"<<file_name<<std::endl;
@@ -153,7 +153,7 @@ void SA::writeResult(const std::string& file_name){
     fout << global_hpwl << std::endl;
     fout << global_area << std::endl;
     fout << global_width << " "<< global_height << std::endl;
-    fout << 0.87 << std::endl;
+    fout << time << std::endl;
     std::vector<std::string>name;
     sp->nameList(name);
     

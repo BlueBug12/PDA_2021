@@ -40,7 +40,7 @@ public:
     double acceptance(double old_e, double new_e, double temperature);
     void run();
     void updateResult();
-    void writeResult(const std::string& file_name);
+    void writeResult(const std::string& file_name, float time);
     
     SP *sp;
     std::vector<int>pos_x;

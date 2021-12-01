@@ -31,7 +31,7 @@ int main(int argc, char **argv){
     double descet_rate = 0.7;
     double initial_t = 1000.0;
     double final_t = 1.0;
-    int markov_iter = 1000000;
+    int markov_iter = 100000;
 
     SA sa(descet_rate,initial_t,final_t,markov_iter);
     
@@ -49,7 +49,7 @@ int main(int argc, char **argv){
 #endif
         period = std::max((float)(it_end-it_beg)/CLOCKS_PER_SEC,period);
     }
-    sa.writeResult(output_name);
+    sa.writeResult(output_name,std::min((float)298.8,(float)(clock()-start)/CLOCKS_PER_SEC));
 #ifdef DISPLAY
     std::cout<<"Final cost:"<<sa.global_cost<<std::endl;
     std::cout<<"Final width:"<<sa.global_width<<" (outline_w = "<<(sa.sp)->outline_w<<")"<<std::endl;
