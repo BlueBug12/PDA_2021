@@ -15,7 +15,8 @@ double SA::acceptance(double old_e, double new_e, double temperature){
 void SA::run(){
 
     double cur_t = m_initial_t;
-    int cur_w, cur_h, cur_hpwl, cur_area, ori_temp;
+    int cur_w, cur_h, cur_hpwl, cur_area;
+    double ori_temp;
     double cur_e = sp->getCost(cur_w, cur_h, cur_hpwl, cur_area,ori_temp);
     b_cost = cur_e;
     b_origin_cost = ori_temp;

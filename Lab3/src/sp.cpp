@@ -136,14 +136,14 @@ double SP::skew(int w, int h){
     }
     return r;
 }
-double SP::getCost(int& w, int& h, int& hpwl, int& area, int& origin_cost){
+double SP::getCost(int& w, int& h, int& hpwl, int& area, double& origin_cost){
     int w_,h_;
     area = getArea(w_,h_);
     hpwl = getHPWL();
     w = w_;
     h = h_;
-    origin_cost = alpha*area + (1-alpha)*hpwl;
-    return skew(w,h)*bounded_alpha*area + (1-bounded_alpha)*hpwl;
+    origin_cost = alpha*(double)area + (1-alpha)*(double)hpwl;
+    return skew(w,h)*bounded_alpha*(double)area + (1-bounded_alpha)*(double)hpwl;
 }
 
 int SP::getArea(int & width, int & height){

@@ -26,7 +26,7 @@ public:
     double skew(int w,int h);
     int getArea(int& width, int& height);
     int getHPWL();
-    double getCost(int& w, int& h, int& hpwl, int& area, int& origin_cost);
+    double getCost(int& w, int& h, int& hpwl, int& area, double& origin_cost);
     void op1();
     void op2();
     void op3();

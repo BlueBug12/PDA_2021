@@ -36,7 +36,7 @@ int main(int argc, char **argv){
     SA sa(descet_rate,initial_t,final_t,markov_iter);
     
     float period = 0.f;
-    float timer = 30.f;
+    float timer = 300.f;
     int i = 0;
     while(timer -(float)(clock()-start)/CLOCKS_PER_SEC > 3*period){
         clock_t it_beg = clock();
