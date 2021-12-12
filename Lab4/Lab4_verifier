@@ -1,0 +1,772 @@
+#!/usr/bin/perl
+
+# -----------------------------------------------------------------------------------
+# Author      : Natarajan Viswanathan (nviswan@us.ibm.com)
+# Description : Check the legality of the current placement
+# Usage       : ispd2011_check_legality <circuit.aux> <solution.pl>
+# -----------------------------------------------------------------------------------
+#     This script checks the following conditions:
+#       Error_Type 0: did a terminal or terminal_NI node move?
+#       ERROR_TYPE 1: is a movable node placed outside the placement area?
+#       ERROR_TYPE 2: is a movable node aligned to the circuit rows?
+#       ERROR_TYPE 3: is a movable node placed on a multiple of sitespacing?
+#       ERROR_TYPE 4: is there any overlap among the nodes (movable and/or fixed)?
+# -----------------------------------------------------------------------------------
+
+use strict;
+
+my $MAX_VAL = 100000000;
+my $MIN_VAL = -100000000;
+# Indices for node attributes in ObjectDB
+my $XLOWINDEX = 0;
+my $YLOWINDEX = 1;
+my $DXINDEX   = 2;
+my $DYINDEX   = 3;
+my $TYPEINDEX = 4;
+my $SHAPEINDEX = 5;
+
+{
+my %DesignDB;         # Benchmark file information
+my %ObjectDB;         # node information
+my %ImageDB;          # Placement image information
+my %SolutionDB;       # Solution information
+
+my $aux_file = $ARGV[0];
+my $sol_file = $ARGV[1];
+
+die "Usage: $0 <circuit.aux> <solution.pl>\n"
+unless(defined($aux_file) && defined($sol_file));
+
+# Error log
+my $out_file;
+if($sol_file =~ m/(.*)\.pl/)
+{
+  $out_file = "$1.legality_error.log";
+}
+else
+{
+  $out_file = "legality_error.log";
+}
+
+read_aux_file($aux_file, \%DesignDB);
+read_nodes_file($DesignDB{nodes}, \%ObjectDB);
+read_shapes_file($DesignDB{shapes}, \%ObjectDB);
+read_pl_file($DesignDB{pl}, \%ObjectDB);
+read_scl_file($DesignDB{scl}, \%ImageDB);
+read_solution_pl_file($sol_file, \%ObjectDB, \%SolutionDB);
+
+check_legality($out_file, \%ObjectDB, \%ImageDB, \%SolutionDB);
+}
+
+###########################
+# .aux file processing
+###########################
+sub read_aux_file {
+  my ($aux_file, $ref_DesignDB) = @_;
+  
+  open(AUXFILE, $aux_file) or die "Can't open: $aux_file ($!)\n";
+  
+  while(<AUXFILE>) {
+    $_ = process_line($_);
+    if(/^(RowBasedPlacement)/)
+    {
+      my @temp = split;
+      $ref_DesignDB->{nodes}  = $temp[2];
+      $ref_DesignDB->{nets}   = $temp[3];
+      $ref_DesignDB->{wts}    = $temp[4];
+      $ref_DesignDB->{pl}     = $temp[5];
+      $ref_DesignDB->{scl}    = $temp[6];
+      $ref_DesignDB->{shapes} = $temp[7];
+      $ref_DesignDB->{route}  = $temp[8];
+      last;
+    }
+    else
+    {
+      next;
+    }
+  }
+  
+  close(AUXFILE);
+}
+
+###################################
+# .nodes file processing
+##################################
+sub read_nodes_file {
+  my ($nodes_file, $ref_ObjectDB) = @_;
+  my ($temp, @temp, $movetype);
+  
+  open(NODESFILE, $nodes_file) or die "Can't open: $nodes_file ($!)\n";
+  
+  my $num_node_records = 0;
+  my $fixed = 0;
+  my $nifixed = 0;
+  while(<NODESFILE>)
+  {
+    $_ = process_line($_);
+    if(/^(UCLA)/ or /^\s*$/ or /^#.*/)
+    {
+      next;
+    }
+    elsif(/^(NumNodes)/)
+    {
+      ($temp, $ref_ObjectDB->{num_nodes}) = split ":";
+      $ref_ObjectDB->{num_nodes} = process_line($ref_ObjectDB->{num_nodes});
+    }
+    elsif(/^(NumTerminals)/)
+    {
+      ($temp, $ref_ObjectDB->{num_terminals}) = split ":";
+      $ref_ObjectDB->{num_terminals} = process_line($ref_ObjectDB->{num_terminals});
+    }
+    else
+    {
+      $num_node_records++;
+      @temp = split;
+      if($temp[3] =~ /(terminal_NI)/)
+      {
+        $movetype = "terminal_NI";
+        $nifixed++;
+      }
+      elsif($temp[3] =~ /(terminal)/)
+      {
+        $movetype = "terminal";
+        $fixed++;
+      }
+      else
+      {
+        $movetype = "movable";
+      }
+      # (xlow, ylow, width, height, movetype)
+      # any shapes will be pushed into this array later
+      my @tmpRecord = (0, 0, $temp[1], $temp[2], $movetype);
+      $ref_ObjectDB->{obj_record}{$temp[0]} = \@tmpRecord;
+    }
+  }
+  
+  close(NODESFILE);
+  
+  $ref_ObjectDB->{fixed_nodes} = $fixed;
+  $ref_ObjectDB->{nifixed_nodes} = $nifixed;
+  
+  die "NumNodes($ref_ObjectDB->{num_nodes}) does not match Num_Node_Records($num_node_records)\n"
+  if($num_node_records != $ref_ObjectDB->{num_nodes});
+  if($ref_ObjectDB->{num_terminals} != $ref_ObjectDB->{fixed_nodes}+$ref_ObjectDB->{nifixed_nodes})
+  {
+    my $temp_str = "NumTerminals($ref_ObjectDB->{num_terminals}) does not match ".
+                   "Terminal($ref_ObjectDB->{fixed_nodes})+Terminal_NI($ref_ObjectDB->{nifixed_nodes})\n";
+    die "$temp_str";
+  }
+  
+  print "Phase 1: .nodes file\n";
+  print "         Total Nodes             : $ref_ObjectDB->{num_nodes}\n";
+  print "         Terminal Nodes          : $ref_ObjectDB->{num_terminals}\n";
+  print "         Fixed Terminal Nodes    : $ref_ObjectDB->{fixed_nodes}\n";
+  print "         Fixed_NI Terminal Nodes : $ref_ObjectDB->{nifixed_nodes}\n";
+}
+
+###################################
+# .shapes file processing
+##################################
+sub read_shapes_file {
+  my ($shapes_file, $ref_ObjectDB) = @_;
+  my ($temp, @temp);
+  
+  open(SHAPESFILE, $shapes_file) or die "Can't open: $shapes_file ($!)\n";
+  
+  my $num_nr_records = 0;
+  while(<SHAPESFILE>)
+  {
+    $_ = process_line($_);
+    if(/^(shapes)/ or /^\s*$/ or /^#.*/)
+    {
+      next;
+    }
+    elsif(/^(NumNonRectangularNodes)/)
+    {
+      ($temp, $ref_ObjectDB->{num_nr_nodes}) = split ":";
+      $ref_ObjectDB->{num_nr_nodes} = process_line($ref_ObjectDB->{num_nr_nodes});
+    }
+    else
+    {
+      $num_nr_records++;
+      my ($name, $num_shapes) = split ":";
+      $name = process_line($name);
+      $num_shapes = process_line($num_shapes);
+      die "Invalid node ($name) in .shapes file\n" 
+      if(!defined($ref_ObjectDB->{obj_record}{$name}));
+      
+      my $shape_id = 0;
+      my %shapes;
+      while(<SHAPESFILE>)
+      {
+        $_ = process_line($_);
+        if(/^\s*$/ or /^#.*/)
+        {
+          next;
+        }
+        else
+        {
+          @temp = split;
+          my @tmpRecord = ($temp[1], $temp[2], $temp[3], $temp[4]);
+          $shapes{$shape_id} = \@tmpRecord;
+          $shape_id++;
+          last if($shape_id == $num_shapes);
+        }
+      }
+      push(@{$ref_ObjectDB->{obj_record}{$name}}, \%shapes);
+    }
+  }
+  
+  close(SHAPESFILE);
+  
+  if($ref_ObjectDB->{num_nr_nodes} != $num_nr_records)
+  {
+    my $temp_str = "NumNonRectangularNodes($ref_ObjectDB->{num_nr_nodes}) does ".
+                   "not match Num_NR_Records($num_nr_records)\n";
+    die "$temp_str";
+  }
+  
+  print "Phase 2: .shapes file\n";
+  print "         Total Non-Rectangular Nodes  : $ref_ObjectDB->{num_nr_nodes}\n";
+}
+
+###################################
+# .pl file processing
+##################################
+sub read_pl_file {
+  my ($pl_file, $ref_ObjectDB) = @_;
+  my ($temp_ct, @temp);
+  
+  open(PLFILE, $pl_file) or die "Can't open: $pl_file ($!)\n";
+  
+  my $num_loc_records = 0;
+  while(<PLFILE>)
+  {
+    $_ = process_line($_);
+    if(/^(UCLA)/ or /^\s*$/ or /^#.*/)
+    {
+      next;
+    }
+    else
+    {
+      $num_loc_records++;
+      @temp = split;
+      $temp_ct = @temp;
+      die "Invalid node ($temp[0]) in .pl file\n" 
+      if(!defined($ref_ObjectDB->{obj_record}{$temp[0]}));
+      
+      # do not worry about node orientation for now, as all nodes 
+      # should have default orientation (no flipping / rotation allowed)
+      ${$ref_ObjectDB->{obj_record}{$temp[0]}}[$XLOWINDEX] = $temp[1];
+      ${$ref_ObjectDB->{obj_record}{$temp[0]}}[$YLOWINDEX] = $temp[2];
+      
+      if($temp[$temp_ct-1] =~ /(FIXED_NI)/)
+      {
+        die "Movetype mismatch for node: $temp[0]\n"
+        if(${$ref_ObjectDB->{obj_record}{$temp[0]}}[$TYPEINDEX] ne "terminal_NI");
+      }
+      elsif($temp[$temp_ct-1] =~ /(FIXED)/)
+      {
+        die "Movetype mismatch for node: $temp[0]\n"
+        if(${$ref_ObjectDB->{obj_record}{$temp[0]}}[$TYPEINDEX] ne "terminal");
+      }
+      else
+      {
+        die "Movetype mismatch for node: $temp[0]\n"
+        if(${$ref_ObjectDB->{obj_record}{$temp[0]}}[$TYPEINDEX] ne "movable");
+      }
+    }
+  }
+  
+  close(PLFILE);
+  
+  die "NumNodes($ref_ObjectDB->{num_nodes}) does not match Num_Loc_Records($num_loc_records)\n"
+  if($ref_ObjectDB->{num_nodes} != $num_loc_records);
+  
+  print "Phase 3: .pl file\n";
+  print "         Total Nodes  : $num_loc_records\n";
+}
+
+###########################
+# .scl file processing
+###########################
+sub read_scl_file {
+  my ($scl_file, $ref_ImageDB) = @_;
+  my ($temp, @temp);
+  
+  $ref_ImageDB->{image_xlow} = $MAX_VAL;
+  $ref_ImageDB->{image_ylow} = $MAX_VAL;
+  $ref_ImageDB->{image_xhigh} = $MIN_VAL;
+  $ref_ImageDB->{image_yhigh} = $MIN_VAL;
+  
+  open(SCLFILE, $scl_file) or die "Can't open: $scl_file ($!)\n";
+  
+  my $num_row_records = 0;
+  while(<SCLFILE>)
+  {
+    $_ = process_line($_);
+    if(/^(UCLA)/ or /^\s*$/ or /^#.*/)
+    {
+      next;
+    }
+    elsif(/^(NumRows)/)
+    {
+      ($temp, $ref_ImageDB->{num_rows}) = split ":";
+      $ref_ImageDB->{num_rows} = process_line($ref_ImageDB->{num_rows});
+    }
+    elsif(/^(CoreRow)/)
+    {
+      # for each row get relevant information
+      while(<SCLFILE>)
+      {
+        $_ = process_line($_);
+        if(/^\s*$/ or /^#.*/)
+        {
+          next;
+        }
+        elsif(/^(End)/)
+        {
+          last;
+        }
+        elsif(/^(Coordinate)/)
+        {
+          ($temp, $ref_ImageDB->{row_record}{$num_row_records}{ylow}) = split ":";
+          $ref_ImageDB->{row_record}{$num_row_records}{ylow} = 
+              process_line($ref_ImageDB->{row_record}{$num_row_records}{ylow});
+        }
+        elsif(/^(Height)/)
+        {
+          if(!defined($ref_ImageDB->{row_record}{$num_row_records}{ylow}))
+          {
+            die "Invalid Coordinate for row: $num_row_records\n";
+          }
+          @temp = split ":";
+          $temp[1] = process_line($temp[1]);
+          $ref_ImageDB->{row_record}{$num_row_records}{yhigh} = 
+                $ref_ImageDB->{row_record}{$num_row_records}{ylow} + $temp[1];
+        }
+        elsif(/^(Sitespacing)/)
+        {
+          ($temp, $ref_ImageDB->{row_record}{$num_row_records}{sitespacing}) = split ":";
+          $ref_ImageDB->{row_record}{$num_row_records}{sitespacing} = 
+              process_line($ref_ImageDB->{row_record}{$num_row_records}{sitespacing});
+        }
+        elsif(/^(SubrowOrigin)/)
+        {
+          if((!defined($ref_ImageDB->{row_record}{$num_row_records}{sitespacing})) || 
+             ($ref_ImageDB->{row_record}{$num_row_records}{sitespacing} <= 0))
+          {
+            die "Invalid Sitespacing for row: $num_row_records\n";
+          }
+          # NV_FIXME: assuming that there is only a single subrow
+          @temp = split;
+          $ref_ImageDB->{row_record}{$num_row_records}{xlow}  = $temp[2];
+          $ref_ImageDB->{row_record}{$num_row_records}{xhigh} = 
+              $temp[2] + $temp[5]*$ref_ImageDB->{row_record}{$num_row_records}{sitespacing};
+        }
+        else
+        {
+          next;
+        }
+      }
+      # check validity of the data for this row
+      die "Invalid xlow for row: $num_row_records\n"
+      if(!defined($ref_ImageDB->{row_record}{$num_row_records}{xlow}));
+      die "Invalid ylow for row: $num_row_records\n"
+      if(!defined($ref_ImageDB->{row_record}{$num_row_records}{ylow}));
+      die "Invalid xhigh for row: $num_row_records\n"
+      if(!defined($ref_ImageDB->{row_record}{$num_row_records}{xhigh}));
+      die "Invalid yhigh for row: $num_row_records\n"
+      if(!defined($ref_ImageDB->{row_record}{$num_row_records}{yhigh}));
+      
+      # get image boundary
+      $ref_ImageDB->{image_xlow} = $ref_ImageDB->{row_record}{$num_row_records}{xlow}
+      if($ref_ImageDB->{image_xlow} > $ref_ImageDB->{row_record}{$num_row_records}{xlow});
+      
+      $ref_ImageDB->{image_ylow} = $ref_ImageDB->{row_record}{$num_row_records}{ylow}
+      if($ref_ImageDB->{image_ylow} > $ref_ImageDB->{row_record}{$num_row_records}{ylow});
+      
+      $ref_ImageDB->{image_xhigh} = $ref_ImageDB->{row_record}{$num_row_records}{xhigh}
+      if($ref_ImageDB->{image_xhigh} < $ref_ImageDB->{row_record}{$num_row_records}{xhigh});
+      
+      $ref_ImageDB->{image_yhigh} = $ref_ImageDB->{row_record}{$num_row_records}{yhigh}
+      if($ref_ImageDB->{image_yhigh} < $ref_ImageDB->{row_record}{$num_row_records}{yhigh});
+      
+      $num_row_records++;
+    } # CoreRow
+    else
+    {
+      next;
+    }
+  } # while(SCLFILE)
+  
+  close(SCLFILE);
+  
+  $ref_ImageDB->{row_height} = 
+      int(($ref_ImageDB->{image_yhigh} - $ref_ImageDB->{image_ylow}) / 
+          $ref_ImageDB->{num_rows});
+  
+  die "NumRows($ref_ImageDB->{num_rows}) does not match Num_Row_Records($num_row_records)\n"
+  if($num_row_records != $ref_ImageDB->{num_rows});
+  
+  print "Phase 4: .scl file\n";
+  print "         NumRows   : $ref_ImageDB->{num_rows}\n";
+  print "         RowHeight : $ref_ImageDB->{row_height}\n";
+  print "         Image     : ";
+  print "($ref_ImageDB->{image_xlow}, $ref_ImageDB->{image_ylow}) - ";
+  print "($ref_ImageDB->{image_xhigh}, $ref_ImageDB->{image_yhigh})\n";
+}
+
+###################################
+# solution.pl file processing
+##################################
+sub read_solution_pl_file {
+  my ($pl_file, $ref_ObjectDB, $ref_SolutionDB) = @_;
+  my (@temp);
+  
+  open(PLFILE, $pl_file) or die "Can't open: $pl_file ($!)\n";
+  
+  my $num_loc_records = 0;
+  while(<PLFILE>)
+  {
+    $_ = process_line($_);
+    if(/^(UCLA)/ or /^\s*$/ or /^#.*/)
+    {
+      next;
+    }
+    else
+    {
+      $num_loc_records++;
+      @temp = split;
+      die "Invalid node ($temp[0]) in solution .pl file\n" 
+      if(!defined($ref_ObjectDB->{obj_record}{$temp[0]}));
+      
+      my @tmpRecord = ($temp[1], $temp[2]);
+      $ref_SolutionDB->{$temp[0]} = \@tmpRecord;
+    }
+  }
+  
+  close(PLFILE);
+  
+  die "NumNodes($ref_ObjectDB->{num_nodes}) does not match Num_Loc_Records($num_loc_records)\n"
+  if($ref_ObjectDB->{num_nodes} != $num_loc_records);
+  
+  print "Phase 5: solution .pl ($pl_file) file\n";
+  print "         Total Nodes  : $num_loc_records\n";
+}
+
+################################
+# check for placement legality
+################################
+sub check_legality {
+  my ($out_file, $ref_ObjectDB, $ref_ImageDB, $ref_SolutionDB) = @_;
+  
+  my $image_xlow  = $ref_ImageDB->{image_xlow};
+  my $image_ylow  = $ref_ImageDB->{image_ylow};
+  my $image_xhigh = $ref_ImageDB->{image_xhigh};
+  my $image_yhigh = $ref_ImageDB->{image_yhigh};
+  my $num_rows    = $ref_ImageDB->{num_rows};
+  my $row_height  = $ref_ImageDB->{row_height};
+  
+  # error counts
+  my ($err_0, $err_1, $err_2, $err_3, $err_4);
+  $err_0 = $err_1 = $err_2 = $err_3 = $err_4 = 0;
+  
+  my @Map;    # placement solution map
+  
+  print "Phase 6: Check Legality\n";
+  
+  open(OUTFILE, ">$out_file") or die "Can't open: $out_file ($!)\n";
+  
+  foreach my $name (keys(%{$ref_ObjectDB->{obj_record}}))
+  {
+    my $obj_dx   = ${$ref_ObjectDB->{obj_record}{$name}}[$DXINDEX];
+    my $obj_dy   = ${$ref_ObjectDB->{obj_record}{$name}}[$DYINDEX];
+    my $movetype = ${$ref_ObjectDB->{obj_record}{$name}}[$TYPEINDEX];
+    my $soln_lx = ${$ref_SolutionDB->{$name}}[$XLOWINDEX];
+    my $soln_ly = ${$ref_SolutionDB->{$name}}[$YLOWINDEX];
+    my $soln_hx = $soln_lx + $obj_dx;
+    my $soln_hy = $soln_ly + $obj_dy;
+    
+    # Error_Type 0: did a terminal or terminal_NI node move?
+    if(($movetype eq "terminal_NI") || ($movetype eq "terminal"))
+    {
+      my $orig_lx = ${$ref_ObjectDB->{obj_record}{$name}}[$XLOWINDEX];
+      my $orig_ly = ${$ref_ObjectDB->{obj_record}{$name}}[$YLOWINDEX];
+      if(($orig_lx != $soln_lx) || ($orig_ly != $soln_ly))
+      {
+        $err_0++;
+        print OUTFILE "ERROR_TYPE 0: Terminal Node ($name) moved ";
+        print OUTFILE "from ($orig_lx, $orig_ly) ";
+        print OUTFILE "to ($soln_lx, $soln_ly)\n";
+      }
+    }
+    elsif($movetype eq "movable")
+    {
+      my $l_row = int(($soln_ly - $image_ylow) / $row_height);
+      my $u_row = int(($soln_hy - $image_ylow) / $row_height);
+      $l_row = min($num_rows-1, max(0, $l_row));
+      $u_row = min($num_rows, max(0, $u_row));
+      $u_row++ if($l_row == $u_row);
+      my $row;
+      
+      # ERROR_TYPE 1: is a movable node placed outside the placement area?
+      if(($soln_lx > $image_xhigh) || ($soln_hx < $image_xlow) || 
+         ($soln_ly > $image_yhigh) || ($soln_hy < $image_ylow))
+      {
+        $err_1++;
+        print OUTFILE "ERROR TYPE 1: Movable node ($name) is placed outside image. ";
+        print OUTFILE "Node BB: ($soln_lx, $soln_ly)-($soln_hx, $soln_hy) ";
+        print OUTFILE "Image BB: ($image_xlow, $image_ylow)-($image_xhigh, $image_yhigh)\n";
+      }
+      else
+      {
+        if(($soln_ly < $image_ylow) || ($soln_hy > $image_yhigh))
+        {
+          $err_1++;
+          print OUTFILE "ERROR_TYPE 1: Movable node ($name) is placed outside image. ";
+          print OUTFILE "Image(ylow, yhigh): ($image_ylow, $image_yhigh) ";
+          print OUTFILE "Node(ylow, yhigh):  ($soln_ly, $soln_hy)\n";
+        }
+        
+        for($row=$l_row; $row<$u_row; $row++)
+        {
+          if(($soln_lx < $ref_ImageDB->{row_record}{$row}{xlow}) || 
+             ($soln_hx > $ref_ImageDB->{row_record}{$row}{xhigh}))
+          {
+            $err_1++;
+            print OUTFILE "ERROR_TYPE 1: Movable node ($name) is placed outside row bounds. ";
+            print OUTFILE "Row ($row)  ";
+            print OUTFILE "Row_Bounds ($ref_ImageDB->{row_record}{$row}{xlow}, ";
+            print OUTFILE "$ref_ImageDB->{row_record}{$row}{xhigh})\n";
+          }
+        }
+      }
+      
+      # ERROR_TYPE 2: is a movable node aligned to the circuit rows?
+      if(($soln_ly != $l_row*$row_height + $image_ylow) || 
+         ($soln_hy != $u_row*$row_height + $image_ylow))
+      {
+        $err_2++;
+        print OUTFILE "ERROR_TYPE 2: Movable node ($name) is not aligned to circuit rows. ";
+        print OUTFILE "Lower_Row($l_row)  Upper_Row($u_row)\n";
+      }
+      
+      # ERROR_TYPE 3: is a movable node placed on a multiple of sitespacing?
+      for($row=$l_row; $row<$u_row; $row++)
+      {
+        my $site_spacing = $ref_ImageDB->{row_record}{$row}{sitespacing};
+        my $row_xlow = $ref_ImageDB->{row_record}{$row}{xlow};
+        my $num_sites = int(($soln_lx - $row_xlow) / $site_spacing);
+        if($soln_lx != $num_sites*$site_spacing + $row_xlow)
+        {
+          $err_3++;
+          print OUTFILE "ERROR_TYPE 3: Movable node ($name) is not placed on a multiple of sitespacing. ";
+          print OUTFILE "Row($row)  Node(xlow): $soln_lx\n";
+        }
+      }
+      
+      # for this movable node, copy the solution coordinates into ObjectDB
+      ${$ref_ObjectDB->{obj_record}{$name}}[$XLOWINDEX] = $soln_lx;
+      ${$ref_ObjectDB->{obj_record}{$name}}[$YLOWINDEX] = $soln_ly;
+    }
+    else
+    {
+      die "Bad movetype ($movetype) for node ($name).\n";
+    }
+  } # end(foreach)
+  
+  # create a placement map of all the nodes in 
+  # the design for overlap calcuation
+  for my $row (0 .. ($num_rows-1))
+  {
+    push @Map, ();
+  }
+  
+  foreach my $name (keys(%{$ref_ObjectDB->{obj_record}}))
+  {
+    my $movetype = ${$ref_ObjectDB->{obj_record}{$name}}[$TYPEINDEX];
+    my ($obj_lx, $obj_ly, $obj_dx, $obj_dy);
+    
+    if($movetype eq "terminal_NI")
+    {
+      next;
+    }
+    else
+    {
+      my $temp_ct = @{$ref_ObjectDB->{obj_record}{$name}};
+      if($temp_ct == $SHAPEINDEX+1)
+      {
+        # this is a non-rectangular node
+        my %shapes = %{${$ref_ObjectDB->{obj_record}{$name}}[$SHAPEINDEX]};
+        die "Incorrect shapes information for object($name).\n"
+        if(scalar(keys(%shapes)) <= 0);
+        
+        foreach my $shape_id (sort(keys(%shapes)))
+        {
+          my $shape_name = "$name"."_shape_"."$shape_id";
+          $obj_lx = ${$shapes{$shape_id}}[$XLOWINDEX];
+          $obj_ly = ${$shapes{$shape_id}}[$YLOWINDEX];
+          $obj_dx = ${$shapes{$shape_id}}[$DXINDEX];
+          $obj_dy = ${$shapes{$shape_id}}[$DYINDEX];
+          populate_map($shape_name, $obj_lx, $obj_ly, $obj_dx, $obj_dy, 
+                       $ref_ImageDB, \@Map, $movetype);
+        }
+      }
+      else
+      {
+        # this is a rectangular node
+        $obj_lx = ${$ref_ObjectDB->{obj_record}{$name}}[$XLOWINDEX];
+        $obj_ly = ${$ref_ObjectDB->{obj_record}{$name}}[$YLOWINDEX];
+        $obj_dx = ${$ref_ObjectDB->{obj_record}{$name}}[$DXINDEX];
+        $obj_dy = ${$ref_ObjectDB->{obj_record}{$name}}[$DYINDEX];
+        populate_map($name, $obj_lx, $obj_ly, $obj_dx, $obj_dy, 
+                     $ref_ImageDB, \@Map, $movetype);
+      }
+    }
+  } # end(foreach)
+  
+  # sort each row in the map in non-decreasing order of node coordinates
+  # (using the lower-left x-coordinate for sorting)
+  for my $row (0 .. ($num_rows-1))
+  {
+    if($Map[$row])
+    {
+      my @sorted_array = sort sort_ascending @{$Map[$row]};
+      splice(@{$Map[$row]});
+      @{$Map[$row]} = @sorted_array;
+    }
+  }
+  
+  #ERROR_TYPE 4: is there any overlap among the nodes (movable and fixed)?
+  for my $row (0 .. ($num_rows-1))
+  {
+    next if(!$Map[$row]);
+    
+    for my $index (0 .. ($#{$Map[$row]}-1))
+    {
+      # NOTE: @this_node = ($name, $obj_lx, $obj_hx, $movetype)
+      my @this_node = split/:+/, $Map[$row][$index];
+      my @next_node = split/:+/, $Map[$row][$index+1];
+      
+      # ignore overlap between fixed nodes
+      next if(($this_node[3] eq "terminal") && ($next_node[3] eq "terminal"));
+      
+      if($this_node[2] > $next_node[1])
+      {
+        $err_4++;
+        print OUTFILE "ERROR_TYPE 4: Overlapping nodes ($this_node[0] and $next_node[0]) at Row($row).\n";
+        print OUTFILE "              $this_node[0]: lx=$this_node[1], hx=$this_node[2]\n";
+        print OUTFILE "              $next_node[0]: lx=$next_node[1], hx=$next_node[2]\n";
+      }
+    }
+  }
+  
+  close(OUTFILE);
+  
+  print "         ERROR_TYPE 0: $err_0\n";
+  print "         ERROR_TYPE 1: $err_1\n";
+  print "         ERROR_TYPE 2: $err_2\n";
+  print "         ERROR_TYPE 3: $err_3\n";
+  print "         ERROR_TYPE 4: $err_4\n";
+  
+  if(($err_0 == 0) && ($err_1 == 0) && ($err_2 == 0) && ($err_3 == 0) && ($err_4 == 0))
+  {
+    print "         Placement is legal\n";
+    # delete the error log as placement is legal
+    my @args = ("rm", "$out_file");
+    print "Could not delete error log ($out_file)\n"
+    if(system(@args));
+  }
+  else
+  {
+    print "         *** Placement is NOT legal ***\n";
+    print "         *** Check Detailed Error Log: $out_file ***\n";
+  }
+}
+
+sub populate_map {
+  my $name    = $_[0];
+  my $obj_lx  = $_[1];
+  my $obj_ly  = $_[2];
+  my $obj_dx  = $_[3];
+  my $obj_dy  = $_[4];
+  my $ref_ImageDB = $_[5];
+  my $ref_Map = $_[6];
+  my $movetype = $_[7];
+  
+  my $image_xlow  = $ref_ImageDB->{image_xlow};
+  my $image_ylow  = $ref_ImageDB->{image_ylow};
+  my $image_xhigh = $ref_ImageDB->{image_xhigh};
+  my $image_yhigh = $ref_ImageDB->{image_yhigh};
+  my $num_rows    = $ref_ImageDB->{num_rows};
+  my $row_height  = $ref_ImageDB->{row_height};
+  
+  my $obj_hx = $obj_lx + $obj_dx;
+  my $obj_hy = $obj_ly + $obj_dy;
+  
+  if(($obj_lx > $image_xhigh) || ($obj_hx < $image_xlow) || 
+     ($obj_ly > $image_yhigh) || ($obj_hy < $image_ylow))
+  {
+    # if the node is completely outside placement image,
+    # then do not add it to the map
+    return;
+  }
+  
+  my $l_row = int(($obj_ly - $image_ylow) / $row_height);
+  my $u_row = int(($obj_hy - $image_ylow) / $row_height);
+  $l_row = min($num_rows-1, max(0, $l_row));
+  $u_row = min($num_rows, max(0, $u_row));
+  $u_row++ if($l_row == $u_row);
+  my $row;
+  
+  for($row=$l_row; $row<$u_row; $row++)
+  {
+    if(($obj_lx > $ref_ImageDB->{row_record}{$row}{xhigh}) || 
+       ($obj_hx < $ref_ImageDB->{row_record}{$row}{xlow}))
+    {
+      # ignore node as it is completely out of the row bounds
+      next;
+    }
+    my $index_string = "$name:$obj_lx:$obj_hx:$movetype";
+    push @{$ref_Map->[$row]}, "$index_string";
+  }
+}
+
+sub process_line {
+  my $line = $_[0];
+  chomp $line;
+  $line =~ s/^\s+//;
+  $line =~ s/\s+$//;
+  
+  return $line;
+}
+
+sub min {
+  if($_[0] < $_[1])
+  {
+    return $_[0];
+  }
+  else
+  {
+    return $_[1];
+  }
+}
+
+sub max {
+  if($_[0] > $_[1])
+  {
+    return $_[0];
+  }
+  else
+  {
+    return $_[1];
+  }
+}
+
+sub sort_ascending {
+  my @a_fields = split/:+/, $a;
+  my @b_fields = split/:+/, $b;
+  
+  $a_fields[1] <=> $b_fields[1];
+}
