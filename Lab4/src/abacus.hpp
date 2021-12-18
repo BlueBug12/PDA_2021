@@ -2,14 +2,22 @@
 #define ABACUS_HPP
 
 #define F(n) for(int i=0;i<n;++i)
-#define DBG(msg, arg...) printf("%s:%s(%d): " msg, __FILE__, __FUNCTION__, __LINE__, ##arg)
+//#define DBG(msg, arg...) printf("%s:%s(%d): " msg, __FILE__, __FUNCTION__, __LINE__, ##arg)
+
 
 #define DEBUG
+#ifdef DEBUG
+#   define M_Assert(Expr, Msg)  __M_Assert(#Expr, Expr, __FILE__, __FUNCTION__, __LINE__, Msg)
+#else
+#   define M_Assert(Expr, Msg) ;
+#endif
+
 
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <map>
 #include <assert.h>
 #include "data_struct.hpp"
 
@@ -25,10 +33,10 @@ public:
     
     void parser(const std::string& aux_file);
     void plParser(const std::string& pl_file);
-    void sclParser(const std::string& scl_file);
+    void sclParser(const std::string& scl_file,std::vector<std::pair<int,int>>& row_range);
     void nodesParser(const std::string& nodes_file);
-    void genRows();//split row by terminals
-    void searchRow();
+    void genRows(std::vector<std::pair<int,int>>& row_range);//split row by terminals
+    int searchRow();
     void run();
     void addCell(Cluster * c, int cell_id, int pos);//may need to meet the constraint
     void addCluster(Cluster * c1, Cluster * c2);
@@ -48,6 +56,7 @@ public:
 private:
     int m_num_rows;
     int m_cell_height;
+    int m_row_base_height;
     int m_num_nodes;
     int m_num_terminals;    
 };

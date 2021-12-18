@@ -1,4 +1,18 @@
 #include "abacus.hpp"
+void __M_Assert(const char* expr_str, bool expr, const char* file, const char* function, int line, const std::string msg)
+{
+    if (!expr)
+    {
+        std::cerr << "Assert failed:\t" << msg << "\n"
+            << "Expected:\t" << expr_str << "\n"
+            << "Source:\t\t" << file <<": "<< function << "()" << ", line " << line << "\n";
+        abort();
+    }
+}
+
+std::string intsToString(int v1,int v2){
+	return std::to_string(v1) + "," + std::to_string(v2);
+}
 
 Abacus::Abacus(const std::string aux_file){
     parser(aux_file);
@@ -21,10 +35,12 @@ void Abacus::parser(const std::string& aux_file){
     if(index!=std::string::npos){
         dir = aux_file.substr(0,index+1);
     }
-
+    std::vector<std::pair<int,int>>row_range;
     nodesParser(dir+nodes_file);
-    sclParser(dir+scl_file);
+    sclParser(dir+scl_file,row_range);
     plParser(dir+pl_file);
+
+    genRows(row_range); 
 }
 
 void Abacus::plParser(const std::string& pl_file){
@@ -40,12 +56,19 @@ void Abacus::plParser(const std::string& pl_file){
     F(m_num_nodes - m_num_terminals){
         int x,y;
         fin >> str >> x >> y >> str >> str;
-        //x_coord.push_back(x);
-        //y_coord.push_back(y);
+        x_coord.push_back(x);
+        y_coord.push_back(y);
+    }
+
+    F(m_num_terminals){
+        int x,y;
+        fin >> str >> x >> y >> str >> str >> str;
+        x_coord.push_back(x);
+        y_coord.push_back(y);
     }
     fin.close();
 }
-void Abacus::sclParser(const std::string& scl_file){
+void Abacus::sclParser(const std::string& scl_file, std::vector<std::pair<int,int>>&row_range){
     std::ifstream fin{scl_file};
     if(!fin){
         std::cerr << "Error: can not open file "<<scl_file<<std::endl;
@@ -57,22 +80,40 @@ void Abacus::sclParser(const std::string& scl_file){
         std::getline(fin,str);
     }
     std::stringstream ss(str);
-    ss >> str >> m_num_rows;
+    ss >> str >> str >> m_num_rows;
     
-    
-    F(m_num_rows){
-        int x, y, width,space;
-        fin >> str >> str;//CoreRow Horizontal
-        fin >> str >> str >> y;//Coordinate : 459
-        fin >> str >> str >> m_cell_height;//Height : 12
-        fin >> str >> str >> str;//Sitewidth : 1
+    int x, width,space;
+    fin >> str >> str;//CoreRow Horizontal
+    fin >> str >> str >> m_row_base_height;//Coordinate : 459
+    fin >> str >> str >> m_cell_height;//Height : 12
+    fin >> str >> str >> str;//Sitewidth : 1
+    fin >> str >> str >> space;//Sitespacing : 1
+    fin >> str >> str >> str;//Siteorient : 1
+    fin >> str >> str >> str;//Sitesymmetry : 1
+    fin >> str >> str >> x >> str >> str >> width;//SubrowOrigin : 459 Numsites : 10692
+    fin >> str;//End
+    width *= space;
+    row_range.push_back({x,x+width});
+    //std::getline(fin,str);
+
+    F(m_num_rows -1){
+        for(int j=0;j<5;++j){
+            std::getline(fin,str);
+        }
         fin >> str >> str >> space;//Sitespacing : 1
         fin >> str >> str >> str;//Siteorient : 1
         fin >> str >> str >> str;//Sitesymmetry : 1
         fin >> str >> str >> x >> str >> str >> width;//SubrowOrigin : 459 Numsites : 10692
         fin >> str;//End
         width *= space;
+        row_range.push_back({x,x+width});
     }
+#ifdef DEBUG
+    F(m_num_rows-1){
+        assert(row_range[i].first==row_range[i+1].first);
+        assert(row_range[i].second==row_range[i+1].second);
+    }
+#endif
 
     fin.close();
 }
@@ -108,8 +149,90 @@ void Abacus::nodesParser(const std::string& nodes_file){
 #endif
     fin.close();
 }
-void Abacus::genRows(){}//split row by terminals
-void Abacus::searchRow(){}
+void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by terminals
+    std::vector<std::map<int,int>>spliter;
+    spliter.resize(m_num_rows);
+    for(int i = m_num_nodes-m_num_terminals;i<m_num_nodes;++i){
+        int y1 = std::max(m_row_base_height,y_coord.at(i)) - m_row_base_height;
+        int y2 = std::min(m_row_base_height + m_cell_height * m_num_rows, y_coord.at(i) + height.at(i)) - m_row_base_height;
+        if(y1 >= y2)
+            continue;
+        int lower_bound = y1/m_cell_height;
+        int upper_bound = y2/m_cell_height;
+        if(y2 % m_cell_height==0){
+            upper_bound -= 1;
+        }
+#ifdef DEBUG
+        int lower = lower_bound*m_cell_height+m_row_base_height;
+        int upper = upper_bound*m_cell_height+m_row_base_height + m_cell_height;
+        int t1 = std::max(m_row_base_height,y_coord.at(i));
+        int t2 = std::min(m_row_base_height + m_cell_height * m_num_rows, y_coord.at(i) + height.at(i));
+        assert( lower <= t1 && lower+m_cell_height > t1);
+        assert( upper >=  t2 && upper-m_cell_height < t2);
+        assert(lower_bound>=0&&upper_bound<(int)spliter.size());
+#endif
+        auto prune = [](int val,int min_v,int max_v)->int {
+            return std::max(std::min(val,max_v),min_v);
+        };
+        while(lower_bound<=upper_bound){
+            int min_left = row_range.at(lower_bound).first;
+            int max_right = row_range.at(lower_bound).second;
+            if(x_coord.at(i)>=max_right||x_coord.at(i)+width.at(i)<=min_left){
+                ++lower_bound;
+                continue;
+            }
+            spliter.at(lower_bound)[prune(x_coord.at(i),min_left,max_right)]++;
+            spliter.at(lower_bound)[prune(x_coord.at(i)+width.at(i),min_left,max_right)]--;
+            ++lower_bound;
+        }
+    }
+#ifdef DEBUG
+    int start_index = (int)rows.size();
+#endif
+    F(m_num_rows){
+        int beg = row_range.at(i).first;
+        int end = row_range.at(i).second;
+        int row_height = m_row_base_height+i*m_cell_height;
+#ifdef DEBUG
+        bool flag =true;
+#endif
+        for(auto & pair: spliter.at(i)){
+#ifdef DEBUG
+            assert(pair.second<=1&&pair.second>=-1);
+            assert(beg<=pair.first);
+            if(pair.second==1)
+                assert(flag==true);
+            else if(pair.second==-1)
+                assert(flag==false);
+            else
+                flag = !flag;
+            flag = !flag;
+#endif
+            if(pair.second == 1){//terminal left
+                if(beg != pair.first){
+                    rows.push_back(Row(beg,pair.first,row_height));
+                }
+            }else if(pair.second == -1){//terminal right
+                beg = pair.first;
+            }else{
+                continue;
+            }
+        }
+        if(beg < end){
+            rows.push_back(Row(beg,end,row_height));
+        }
+#ifdef DEBUG
+		for(;start_index<(int)rows.size();++start_index){
+			Row& r = rows.at(start_index);
+			assert(r.left_x<r.right_x);
+			if(start_index<(int)rows.size()-1)
+				M_Assert(r.right_x < rows.at(start_index+1).left_x,intsToString(r.right_x,rows.at(start_index+1).left_x));
+		}
+#endif
+    }
+}
+
+int Abacus::searchRow(){}
 void Abacus::run(){}
 void Abacus::addCell(Cluster * c, int cell_id, int pos){}//may need to meet the constraint
 void Abacus::addCluster(Cluster * c1, Cluster * c2){}

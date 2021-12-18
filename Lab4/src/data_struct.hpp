@@ -28,7 +28,7 @@ struct Row{
     Row() = delete;
     Row(int x1, int x2, int _y):left_x(x1),right_x(x2),y(_y){}
     Row(Row const &) = delete;
-    Row(Row &&) = delete;
+    Row(Row &&) = default;
     Row & operator=(Row const &) = default;
     Row & operator=(Row &&) = default;
     ~Row() = default;
