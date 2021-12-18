@@ -2,8 +2,6 @@
 #define ABACUS_HPP
 
 #define F(n) for(int i=0;i<n;++i)
-//#define DBG(msg, arg...) printf("%s:%s(%d): " msg, __FILE__, __FUNCTION__, __LINE__, ##arg)
-
 
 #define DEBUG
 #ifdef DEBUG

@@ -230,6 +230,22 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
 		}
 #endif
     }
+#ifdef DEBUG
+	///check overlap
+	for(int i = m_num_nodes-m_num_terminals;i<m_num_nodes;++i){
+		int x1 = x_coord[i];
+		int y1 = y_coord[i];
+		int x2 = x1 + width[i];
+		int y2 = y1 + height[i];	
+		for(int j = 0;j<m_num_rows;++j){
+			int r_x1 = rows.at(j).left_x;
+			int r_x2 = rows.at(j).right_x;
+			int r_y1 = rows.at(j).y;
+			int r_y2 = r_y1 + m_cell_height;
+			assert(x2<=r_x1 || x1>=r_x2 || y2 <= r_y1 || y1 >=r_y2);
+		}
+	}
+#endif
 }
 
 int Abacus::searchRow(){}
