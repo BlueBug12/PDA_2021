@@ -15,6 +15,7 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <numeric>
 #include <map>
 #include <assert.h>
 #include "data_struct.hpp"
@@ -31,19 +32,20 @@ public:
     
     void parser(const std::string& aux_file);
     void plParser(const std::string& pl_file);
-    void sclParser(const std::string& scl_file,std::vector<std::pair<int,int>>& row_range);
+    void sclParser(const std::string& scl_file, std::vector<std::pair<int,int>>& row_range);
     void nodesParser(const std::string& nodes_file);
     void genRows(std::vector<std::pair<int,int>>& row_range);//split row by terminals
-    int searchRow();
+    int searchRow(int cell_id);
     void run();
-    void addCell(Cluster * c, int cell_id, int pos);//may need to meet the constraint
+    void addCell(Cluster * c, int cell_id, int row_id);//may need to meet the constraint
     void addCluster(Cluster * c1, Cluster * c2);
-    Cluster * collapse(Cluster * c);
+    void collapse(const int x_min, const int x_max, std::vector<Cluster *>& clusters);
     void writeOutput();
     int placeRow(std::vector<Cluster *>record, int r_index);//return cost
     void getPosition();
     
     std::vector<Row>rows;
+	std::vector<std::pair<int,int>>row_index;
     //after index [m_num_nodes-m_num_terminals], it represents information of terminals
     std::vector<int>width;
     std::vector<int>height;

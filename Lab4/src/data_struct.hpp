@@ -2,12 +2,10 @@
 #define DATA_STRUCT_HPP
 
 struct Cluster{
-    Cluster(){
-        x = 0;
+    Cluster(int _x, int _beg):x(_x),beg(_beg){
         e = 0;
         q = 0;
         w = 0;
-        beg = -1;
         end = -1;
     }
     Cluster(Cluster const &) = delete;
@@ -26,7 +24,9 @@ struct Cluster{
 
 struct Row{
     Row() = delete;
-    Row(int x1, int x2, int _y):left_x(x1),right_x(x2),y(_y){}
+    Row(int x1, int x2, int _y):left_x(x1),right_x(x2),y(_y){
+        space = right_x - left_x;
+    }
     Row(Row const &) = delete;
     Row(Row &&) = default;
     Row & operator=(Row const &) = default;
@@ -35,6 +35,7 @@ struct Row{
     const int left_x;
     const int right_x;
     const int y;
+    int space;
     std::vector<int>cells;
     std::vector<Cluster *>clusters;//??
 };
