@@ -17,6 +17,7 @@
 #include <sstream>
 #include <numeric>
 #include <map>
+#include <algorithm>
 #include <assert.h>
 #include "data_struct.hpp"
 
@@ -41,7 +42,7 @@ public:
     void addCluster(Cluster * c1, Cluster * c2);
     void collapse(const int x_min, const int x_max, std::vector<Cluster *>& clusters);
     void writeOutput();
-    int placeRow(std::vector<Cluster *>record, int r_index);//return cost
+    int placeRow(int cell_id, int row_id, bool recover = true);//return cost
     void getPosition();
     
     std::vector<Row>rows;

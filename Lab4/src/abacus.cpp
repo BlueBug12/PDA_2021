@@ -249,6 +249,36 @@ int Abacus::searchRow(int cell_id){
     return std::min(m_num_rows-1,y);
 }
 void Abacus::run(){
+    order.resize(m_num_nodes-m_num_terminals);    
+    std::iota(order.begin(),order.end(),0);
+    std::sort(order.begin(),order.end(),
+            [&](int v1, int v2){return x_coord.at(v1) < x_coord.at(v2);
+            });
+    for(auto & cell_id: order){
+        int center = searchRow(cell_id);
+        int best_row = center;
+        int best_cost = placeRow(cell_id, center);
+        for(int up = center+1;up<center+6;++up){
+            if(up>=m_num_rows)
+                break;
+            int cost = placeRow(cell_id, up);
+            if(cost < best_cost){
+                best_cost = cost;
+                best_row = up;
+            }
+        }
+        for(int down = center-1;down>=center-6;--down){
+            if(down<0)
+                break;
+            int cost = placeRow(cell_id, down);
+            if(cost < best_cost){
+                best_cost = cost;
+                best_row = down;
+            }
+        }
+        placeRow(cell_id,best_row,false);
+    }
+    getPosition();
 }
 
 void Abacus::addCell(Cluster * c, int cell_id, int row_id){//may need to meet the constraint
@@ -274,12 +304,30 @@ void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster *>& 
 	if(pre_c && pre_c->x+pre_c->w > c->x ){
 		addCluster(pre_c,c);
         clusters.pop_back();
-		delete c;
+		//delete c; memory  leak. Need to change vector<Cluster *> to vector<Cluster>
 		collapse(x_min,x_max,clusters);
 	}
 }
 void Abacus::writeOutput(){}
-int Abacus::placeRow(std::vector<Cluster *>record, int r_index){}//return cost
+int Abacus::placeRow(int cell_id, int row_id, bool recover){
+    std::vector<Cluster *>saver;
+    int cost = 0;
+    if(recover){
+        saver = rows.at(row_id).clusters;
+    }
+    /*
+     *
+     * */
+
+    if(recover){
+        rows.at(row_is).clusters = saver;
+    }else{
+        rows.at(row_id).cells.push_back(cell_id);
+        //write y coordinate 
+    } 
+    return cost; 
+}//return cost
+
 void Abacus::getPosition(){
     for(Row &r: rows){
         for(Cluster *c : r.clusters){
