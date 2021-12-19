@@ -9,7 +9,7 @@ struct Cluster{
         end = -1;
     }
     Cluster(Cluster const &) = default;
-    Cluster(Cluster &&) = delete;
+    Cluster(Cluster &&) = default;
     Cluster & operator=(Cluster const &) = default;
     Cluster & operator=(Cluster &&) = default;
     ~Cluster() = default;

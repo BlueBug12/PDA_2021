@@ -10,6 +10,13 @@ void __M_Assert(const char* expr_str, bool expr, const char* file, const char* f
     }
 }
 
+inline int prune(int val,int min_v,int max_v){
+#ifdef DEBUG
+    assert(min_v<=max_v);
+#endif
+    return std::max(std::min(val,max_v),min_v);
+}
+
 std::string intsToString(int v1,int v2){
 	return std::to_string(v1) + "," + std::to_string(v2);
 }
@@ -55,16 +62,20 @@ void Abacus::plParser(const std::string& pl_file){
     }
     F(m_num_nodes - m_num_terminals){
         int x,y;
-        fin >> str >> x >> y >> str >> str;
+        std::string cell_name;
+        fin >> cell_name >> x >> y >> str >> str;
         x_coord.push_back(x);
         y_coord.push_back(y);
+        cell_names.push_back(std::move(cell_name));
     }
 
     F(m_num_terminals){
         int x,y;
-        fin >> str >> x >> y >> str >> str >> str;
+        std::string cell_name;
+        fin >> cell_name >> x >> y >> str >> str >> str;
         x_coord.push_back(x);
         y_coord.push_back(y);
+        cell_names.push_back(std::move(cell_name));
     }
     fin.close();
 }
@@ -164,9 +175,6 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
         assert( upper >=  t2 && upper-m_cell_height < t2);
         assert(lower_bound>=0&&upper_bound<(int)spliter.size());
 #endif
-        auto prune = [](int val,int min_v,int max_v)->int {
-            return std::max(std::min(val,max_v),min_v);
-        };
         while(lower_bound<=upper_bound){
             int min_left = row_range.at(lower_bound).first;
             int max_right = row_range.at(lower_bound).second;
@@ -247,7 +255,7 @@ int Abacus::searchRow(int cell_id){
     if(y%m_cell_height>0.5*m_cell_height){
         y++;
     }
-    return std::min(m_num_rows-1,y);
+    return prune(y,0,m_num_rows-1);
 }
 void Abacus::run(){
     order.resize(m_num_nodes-m_num_terminals);    
@@ -255,10 +263,13 @@ void Abacus::run(){
     std::sort(order.begin(),order.end(),
             [&](int v1, int v2){return x_coord.at(v1) < x_coord.at(v2);
             });
+
     for(auto & cell_id: order){
+        //std::cout<<"coordinate:"<<x_coord[cell_id]<<","<<y_coord[cell_id]<<std::endl;
         int center = searchRow(cell_id);
         int best_row = center;
         int best_cost = placeRow(cell_id, center);
+        //std::cout<<"initial cost:"<<best_cost<<std::endl;
         for(int up = center+1;up<center+6;++up){
             if(up>=m_num_rows)
                 break;
@@ -277,6 +288,10 @@ void Abacus::run(){
                 best_row = down;
             }
         }
+#ifdef DEBUG
+        //std::cout<<"best cost"<<best_cost<<std::endl;
+        assert(best_cost!=INT_MAX);
+#endif
         placeRow(cell_id,best_row,false);
     }
     getPosition();
@@ -288,6 +303,9 @@ void Abacus::addCell(Cluster &c, int cell_id, int row_id){//may need to meet the
 	c.q += x_coord.at(cell_id)-c.w;
 	c.w += width.at(cell_id);	
     rows.at(row_id).space -= width.at(cell_id);
+#ifdef DEBUG
+    assert(rows.at(row_id).space>=0);
+#endif 
 }
 
 void Abacus::addCluster(Cluster & c1, Cluster & c2){
@@ -296,51 +314,84 @@ void Abacus::addCluster(Cluster & c1, Cluster & c2){
 	c1.q += c2.q - c2.e * c1.w;
 	c1.w += c2.w;
 }
-void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters){
+void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters, int & cost){
     Cluster &c = clusters.back();
 	int optimal_x = c.q/c.e;
-	optimal_x = std::max(optimal_x,x_min);
-	optimal_x = std::min(optimal_x+c.w,x_max);
+    optimal_x = prune(optimal_x, x_min, x_max-c.w);
+    cost += c.e*std::abs(optimal_x-c.x);
+    c.x = optimal_x;
     if(clusters.size() > 1){
         Cluster &pre_c = clusters.at(clusters.size()-2) ;
         if(pre_c.x+pre_c.w > c.x){
             addCluster(pre_c,c);
             clusters.pop_back();
-            //delete c; memory  leak. Need to change vector<Cluster *> to vector<Cluster>
-            collapse(x_min,x_max,clusters);
+            collapse(x_min,x_max,clusters,cost);
         }
-         
     }
 }
-void Abacus::writeOutput(){}
+void Abacus::writeOutput(const std::string file_name){
+    std::ofstream fout{file_name};
+    if(!fout){
+        std::cerr << "Error: can not open file "<<file_name<<std::endl;
+        exit(1);
+    }
+
+    F(m_num_nodes-m_num_terminals){
+        fout << cell_names.at(i) << " " << x_coord.at(i) << " " << y_coord.at(i) << " : N"<<std::endl;
+    }
+    for(int i = m_num_nodes-m_num_terminals;i<m_num_nodes;++i){
+        fout << cell_names.at(i) << " " << x_coord.at(i) << " " << y_coord.at(i) << " : N /FIXED"<<std::endl;
+    }
+     
+    fout.close();
+}
 int Abacus::placeRow(int cell_id, int row_id, bool recover){
     std::vector<Cluster>saver;
     int cost = 0;
-    
     int subrow = row_index.at(row_id).first;
     while(rows.at(subrow).space < width.at(cell_id)){
         ++subrow;
         if(subrow == row_index.at(row_id).second){
+            row_index.at(row_id).first = subrow;
             return INT_MAX;
         }
     }
-
+    row_index.at(row_id).first = subrow;
+    Row &r = rows.at(subrow);
     if(recover){
-        saver = rows.at(row_id).clusters;
+        saver = r.clusters;
     }
-    int pos_x = std::max(std::min(x_coord.at(cell_id),rows.at(row_id).right_x-width.at(cell_id)),rows.at(row_id).left_x);
-
-    
-
-
-
-
-
-    if(recover){
-        rows.at(row_id).clusters = saver;
+    int pos_x = prune(x_coord.at(cell_id),r.left_x,r.right_x-width.at(cell_id));
+    std::vector<Cluster> & cs = r.clusters;
+    if(cs.empty() || cs.back().x + cs.back().w <= pos_x){
+        Cluster c = Cluster(pos_x,(int)r.cells.size());
+        addCell(c,cell_id,subrow);
+        cs.push_back(std::move(c));
+        cost = std::abs(r.y-y_coord.at(cell_id))+std::abs(pos_x - x_coord.at(cell_id));
     }else{
-        rows.at(row_id).cells.push_back(cell_id);
-        //write y coordinate 
+        addCell(cs.back(),cell_id,subrow);
+        cost = std::abs(r.y-y_coord.at(cell_id))+std::abs(pos_x - x_coord.at(cell_id));
+        collapse(r.left_x,r.right_x,cs,cost);
+    }
+#ifdef DEBUG
+    if(!cs.empty()){
+        M_Assert(cs.front().x >= r.left_x,intsToString(cs.front().x ,r.left_x));
+        M_Assert(cs.back().x +cs.back().w <= r.right_x,intsToString(cs.back().x+cs.back().w ,r.right_x));
+    }
+    int space_ = r.right_x - r.left_x;
+    F((int)cs.size()){
+        space_ -= cs[i].w;
+    }
+    M_Assert(space_==r.space,intsToString(space_,r.space));
+    for(int i=0;i<(int)cs.size()-1;++i){
+        M_Assert(cs[i].x+ cs[i].w <= cs[i+1].x,intsToString(cs[i].x+ cs[i].w ,cs[i+1].x));
+    }
+#endif
+    if(recover){
+        r.clusters = saver;
+        r.space += width.at(cell_id);
+    }else{
+        r.cells.push_back(cell_id);
     } 
     return cost; 
 }
@@ -351,6 +402,7 @@ void Abacus::getPosition(){
             int x = c.x;
             for(int i=c.beg;i<=c.end;++i){
                 x_coord.at(r.cells.at(i)) = x;
+                y_coord.at(r.cells.at(i)) = r.y;
                 x += width.at(r.cells.at(i));
             }
         }

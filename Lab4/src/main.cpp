@@ -8,6 +8,8 @@ int main(int argc, char ** argv){
         exit(1);
     }
     Abacus *ab = new Abacus(argv[1]);
+    ab->run();
+    ab->writeOutput("output.pl");
     delete ab;
     return 0;
 }

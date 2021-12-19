@@ -41,8 +41,8 @@ public:
     void run();
     void addCell(Cluster & c, int cell_id, int row_id);//may need to meet the constraint
     void addCluster(Cluster & c1, Cluster & c2);
-    void collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters);
-    void writeOutput();
+    void collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters, int & cost);
+    void writeOutput(const std::string file_name);
     int placeRow(int cell_id, int row_id, bool recover = true);//return cost
     void getPosition();
     
@@ -54,6 +54,7 @@ public:
     std::vector<int>x_coord;
     std::vector<int>y_coord;
     std::vector<int>order;
+    std::vector<std::string>cell_names;
 
 private:
     int m_num_rows;
