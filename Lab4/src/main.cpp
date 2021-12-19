@@ -10,6 +10,7 @@ int main(int argc, char ** argv){
     Abacus *ab = new Abacus(argv[1]);
     ab->run();
     ab->writeOutput("output.pl");
+    ab->writeGDT("test.gdt");
     delete ab;
     return 0;
 }

@@ -44,6 +44,7 @@ public:
     void collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters, int & cost);
     void writeOutput(const std::string file_name);
     int placeRow(int cell_id, int row_id, bool recover = true);//return cost
+    void writeGDT(std::string file_name);
     void getPosition();
     
     std::vector<Row>rows;

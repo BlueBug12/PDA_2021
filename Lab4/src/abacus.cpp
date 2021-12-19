@@ -416,3 +416,38 @@ void Abacus::getPosition(){
     M_Assert(counter==counter2,intsToString(counter,counter2));
 #endif
 }
+
+void Abacus::writeGDT(std::string file_name){
+    std::ofstream fout{file_name};
+    if(!fout){
+        std::cerr << "Error: can not open file "<<file_name<<std::endl;
+        exit(1);
+    }
+    
+    fout <<"gds2{600\nm=2018-09-14 14:26:15 a=2018-09-14 14:26:15\nlib 'asap7sc7p5t_24_SL' 1 1e-6\ncell{c=2018-09-14 14:26:15 m=2018-09-14 14:26:15 'AND2x2_ASAP7_75t_SL'\n";
+    
+    for(int i = m_num_nodes-m_num_terminals;i<m_num_nodes;++i){
+        fout << "b{" << "0" << " xy(" << x_coord[i] << " " << y_coord[i] << " " 
+            << x_coord[i] << " " << y_coord[i] + height[i] << " "
+            << x_coord[i] + width[i] << " " << y_coord[i] + height[i] << " "
+            << x_coord[i] + width[i] << " " << y_coord[i] << ")}" << std::endl;
+    }
+
+    //row
+    for(Row& r:rows){
+        fout << "b{" << "1" << " xy(" << r.left_x << " " << r.y << " " << r.left_x << " "
+            << r.y+m_cell_height << " " << r.right_x << " " <<r.y+m_cell_height<<" "<< " "
+            << r.right_x << " " << r.y << ")}" << std::endl; 
+    }
+    
+    //cell
+    F(m_num_nodes-m_num_terminals){
+        fout << "b{" << "2" << " xy(" << x_coord[i] << " " << y_coord[i] << " " 
+            << x_coord[i] << " " << y_coord[i] + height[i] << " "
+            << x_coord[i] + width[i] << " " << y_coord[i] + height[i] << " "
+            << x_coord[i] + width[i] << " " << y_coord[i] << ")}" << std::endl;
+    }
+
+    fout << "}\n}\n";
+    fout.close();
+}
