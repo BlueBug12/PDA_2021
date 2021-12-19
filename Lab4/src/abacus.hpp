@@ -16,6 +16,7 @@
 #include <vector>
 #include <sstream>
 #include <numeric>
+#include <climits>
 #include <map>
 #include <algorithm>
 #include <assert.h>
@@ -38,9 +39,9 @@ public:
     void genRows(std::vector<std::pair<int,int>>& row_range);//split row by terminals
     int searchRow(int cell_id);
     void run();
-    void addCell(Cluster * c, int cell_id, int row_id);//may need to meet the constraint
-    void addCluster(Cluster * c1, Cluster * c2);
-    void collapse(const int x_min, const int x_max, std::vector<Cluster *>& clusters);
+    void addCell(Cluster & c, int cell_id, int row_id);//may need to meet the constraint
+    void addCluster(Cluster & c1, Cluster & c2);
+    void collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters);
     void writeOutput();
     int placeRow(int cell_id, int row_id, bool recover = true);//return cost
     void getPosition();

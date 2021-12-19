@@ -8,7 +8,7 @@ struct Cluster{
         w = 0;
         end = -1;
     }
-    Cluster(Cluster const &) = delete;
+    Cluster(Cluster const &) = default;
     Cluster(Cluster &&) = delete;
     Cluster & operator=(Cluster const &) = default;
     Cluster & operator=(Cluster &&) = default;
@@ -37,7 +37,7 @@ struct Row{
     const int y;
     int space;
     std::vector<int>cells;
-    std::vector<Cluster *>clusters;//??
+    std::vector<Cluster>clusters;//??
 };
 
 #endif

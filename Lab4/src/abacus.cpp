@@ -214,6 +214,7 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
         }
 		row_index.push_back({start_index,(int)rows.size()});
 #ifdef DEBUG
+        assert(start_index!=(int)rows.size());
 		for(;start_index<(int)rows.size();++start_index){
 			Row& r = rows.at(start_index);
 			assert(r.left_x<r.right_x);
@@ -281,58 +282,74 @@ void Abacus::run(){
     getPosition();
 }
 
-void Abacus::addCell(Cluster * c, int cell_id, int row_id){//may need to meet the constraint
-	c->end = (int)rows.at(row_id).clusters.size();
-	c->e += 1;
-	c->q += x_coord.at(cell_id)-c->w;
-	c->w += width.at(cell_id);	
+void Abacus::addCell(Cluster &c, int cell_id, int row_id){//may need to meet the constraint
+	c.end = (int)rows.at(row_id).clusters.size();
+	c.e += 1;
+	c.q += x_coord.at(cell_id)-c.w;
+	c.w += width.at(cell_id);	
     rows.at(row_id).space -= width.at(cell_id);
 }
 
-void Abacus::addCluster(Cluster * c1, Cluster * c2){
-	c1->end = c2->end;
-	c1->e += c2->e;
-	c1->q += c2->q - c2->e*c1->w;
-	c1->w += c2->w;
+void Abacus::addCluster(Cluster & c1, Cluster & c2){
+	c1.end = c2.end;
+	c1.e += c2.e;
+	c1.q += c2.q - c2.e * c1.w;
+	c1.w += c2.w;
 }
-void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster *>& clusters){
-    Cluster *c = clusters.back();
-	int optimal_x = c->q/c->e;
+void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster>& clusters){
+    Cluster &c = clusters.back();
+	int optimal_x = c.q/c.e;
 	optimal_x = std::max(optimal_x,x_min);
-	optimal_x = std::min(optimal_x+c->w,x_max);
-    Cluster *pre_c = clusters.size()>1 ? clusters.at(clusters.size()-2) : nullptr;
-	if(pre_c && pre_c->x+pre_c->w > c->x ){
-		addCluster(pre_c,c);
-        clusters.pop_back();
-		//delete c; memory  leak. Need to change vector<Cluster *> to vector<Cluster>
-		collapse(x_min,x_max,clusters);
-	}
+	optimal_x = std::min(optimal_x+c.w,x_max);
+    if(clusters.size() > 1){
+        Cluster &pre_c = clusters.at(clusters.size()-2) ;
+        if(pre_c.x+pre_c.w > c.x){
+            addCluster(pre_c,c);
+            clusters.pop_back();
+            //delete c; memory  leak. Need to change vector<Cluster *> to vector<Cluster>
+            collapse(x_min,x_max,clusters);
+        }
+         
+    }
 }
 void Abacus::writeOutput(){}
 int Abacus::placeRow(int cell_id, int row_id, bool recover){
-    std::vector<Cluster *>saver;
+    std::vector<Cluster>saver;
     int cost = 0;
+    
+    int subrow = row_index.at(row_id).first;
+    while(rows.at(subrow).space < width.at(cell_id)){
+        ++subrow;
+        if(subrow == row_index.at(row_id).second){
+            return INT_MAX;
+        }
+    }
+
     if(recover){
         saver = rows.at(row_id).clusters;
     }
-    /*
-     *
-     * */
+    int pos_x = std::max(std::min(x_coord.at(cell_id),rows.at(row_id).right_x-width.at(cell_id)),rows.at(row_id).left_x);
+
+    
+
+
+
+
 
     if(recover){
-        rows.at(row_is).clusters = saver;
+        rows.at(row_id).clusters = saver;
     }else{
         rows.at(row_id).cells.push_back(cell_id);
         //write y coordinate 
     } 
     return cost; 
-}//return cost
+}
 
 void Abacus::getPosition(){
     for(Row &r: rows){
-        for(Cluster *c : r.clusters){
-            int x = c->x;
-            for(int i=c->beg;i<=c->end;++i){
+        for(Cluster &c : r.clusters){
+            int x = c.x;
+            for(int i=c.beg;i<=c.end;++i){
                 x_coord.at(r.cells.at(i)) = x;
                 x += width.at(r.cells.at(i));
             }
