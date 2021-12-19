@@ -264,7 +264,7 @@ void Abacus::run(){
             [&](int v1, int v2){return x_coord.at(v1) < x_coord.at(v2);
             });
 
-    for(auto & cell_id: order){
+    for(int cell_id: order){
         //std::cout<<"coordinate:"<<x_coord[cell_id]<<","<<y_coord[cell_id]<<std::endl;
         int center = searchRow(cell_id);
         int best_row = center;
@@ -298,7 +298,7 @@ void Abacus::run(){
 }
 
 void Abacus::addCell(Cluster &c, int cell_id, int row_id){//may need to meet the constraint
-	c.end = (int)rows.at(row_id).clusters.size();
+	c.end = (int)rows.at(row_id).cells.size();
 	c.e += 1;
 	c.q += x_coord.at(cell_id)-c.w;
 	c.w += width.at(cell_id);	
@@ -397,14 +397,22 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
 }
 
 void Abacus::getPosition(){
+    int counter = 0;
+    int counter2 = 0;
     for(Row &r: rows){
+        counter2 += (int)r.cells.size();
         for(Cluster &c : r.clusters){
             int x = c.x;
             for(int i=c.beg;i<=c.end;++i){
+                ++counter;
                 x_coord.at(r.cells.at(i)) = x;
                 y_coord.at(r.cells.at(i)) = r.y;
                 x += width.at(r.cells.at(i));
             }
         }
     }
+#ifdef DEBUG
+    M_Assert(counter2==m_num_nodes-m_num_terminals,intsToString(counter2,m_num_nodes-m_num_terminals));
+    M_Assert(counter==counter2,intsToString(counter,counter2));
+#endif
 }

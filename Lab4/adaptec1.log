@@ -1,0 +1,15 @@
+     ##############################################################
+     #  [Physical Design Automation 2012] Displacement Calculator #
+     #------------------------------------------------------------#
+     #    1. Check for displacement                               #
+     #    2. Check if fixed node are moved                        #
+     #------------------------------------------------------------#
+     # Compiled in 64 bits on Sun Apr 15 21:01:29 CST 2012        #
+     # with GCC 4.1.2                                             #
+     ###############################################################
+
+info: [Parser] - Parsing Pl - 211447 - Parsed - (0.068630 sec.)
+info: [Parser] - Parsing Pl - 211443 - Parsed - (0.065202 sec.)
+info: [Building Input Node] - 211447 Build
+info: [Total Displacement] - 450341404
+info: Execution Time: 0.387694 seconds
