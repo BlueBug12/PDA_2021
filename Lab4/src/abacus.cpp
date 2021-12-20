@@ -357,8 +357,7 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
     std::vector<Cluster>saver;
     int cost = 0;
     int subrow = row_index.at(row_id).first;
-    while(rows.at(subrow).right_x<x_coord.at(cell_id)||rows.at(subrow).space<width.at(cell_id)
-            ||rows.at(subrow).right_x-rows.at(subrow).left_x<width.at(cell_id)){
+    while(rows.at(subrow).right_x<x_coord.at(cell_id)||rows.at(subrow).space<width.at(cell_id)){
         ++subrow;
         if(subrow == row_index.at(row_id).second){
             subrow-=1;
@@ -371,6 +370,11 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
         }
         
     }
+    if(subrow>row_index.at(row_id).first && rows.at(subrow-1).space >= width.at(cell_id) && 
+            x_coord.at(cell_id) - rows.at(subrow-1).right_x <= rows.at(subrow).left_x - x_coord.at(cell_id)-width.at(cell_id)){
+        subrow -= 1;
+    }
+
     Row &r = rows.at(subrow);
     if(recover){
         saver = r.clusters;
