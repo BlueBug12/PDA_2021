@@ -278,7 +278,7 @@ void Abacus::run(){
         int center = searchRow(cell_id);
         int best_row = center;
         int best_cost = placeRow(cell_id, center);
-        for(int up = center+1;up<center+13;++up){
+        for(int up = center+1;std::abs(up*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;++up){
             if(up>=m_num_rows)
                 break;
             int cost = placeRow(cell_id, up);
@@ -287,7 +287,7 @@ void Abacus::run(){
                 best_row = up;
             }
         }
-        for(int down = center-1;down>=center-13;--down){
+        for(int down = center-1;std::abs(down*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;--down){
             if(down<0)
                 break;
             int cost = placeRow(cell_id, down);
@@ -326,7 +326,7 @@ void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster>& cl
     Cluster &c = clusters.back();
 	int optimal_x = c.q/c.e;
     optimal_x = prune(optimal_x, x_min, x_max-c.w);
-    //cost += c.e*std::abs(optimal_x-c.x);
+    cost += c.e*std::abs(optimal_x-c.x);
     c.x = optimal_x;
     if(clusters.size() > 1){
         Cluster &pre_c = clusters.at(clusters.size()-2) ;
