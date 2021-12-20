@@ -6,13 +6,19 @@ make
 ./LAB4 [input.aux]
 ```
 testcase: newblue5
+
 ![](https://i.imgur.com/9RiXigG.png)
+
 zoom in:
+
 ![](https://i.imgur.com/IkLbeIz.png)
 
 testcase: adaptec1
+
 ![](https://i.imgur.com/8Bg9MZu.png)
+
 zoom in:
+
 ![](https://i.imgur.com/dGkcGmB.png)
 
 
