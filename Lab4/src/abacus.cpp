@@ -357,11 +357,19 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
     std::vector<Cluster>saver;
     int cost = 0;
     int subrow = row_index.at(row_id).first;
-    while(rows.at(subrow).space < width.at(cell_id)){
+    while(rows.at(subrow).right_x<x_coord.at(cell_id)||rows.at(subrow).space<width.at(cell_id)
+            ||rows.at(subrow).right_x-rows.at(subrow).left_x<width.at(cell_id)){
         ++subrow;
         if(subrow == row_index.at(row_id).second){
-            return INT_MAX;
+            subrow-=1;
+            if(subrow<0||rows.at(subrow).space<width.at(cell_id)||rows.at(subrow).right_x-rows.at(subrow).left_x<width.at(cell_id)){
+                return INT_MAX;
+            }
+            else{
+                break;
+            }
         }
+        
     }
     Row &r = rows.at(subrow);
     if(recover){
@@ -374,10 +382,8 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
         addCell(c,cell_id,subrow);
         cs.push_back(std::move(c));
         cost = std::abs(r.y-y_coord.at(cell_id))+std::abs(pos_x - x_coord.at(cell_id));
-        //std::cout<<x_coord[cell_id]<<"->"<<pos_x<<":"<<y_coord[cell_id]<<"->"<<r.y<<std::endl;
     }else{
         addCell(cs.back(),cell_id,subrow);
-        //cost = std::pow(r.y-y_coord.at(cell_id),2)+std::pow(pos_x - x_coord.at(cell_id),2);
         collapse(r.left_x,r.right_x,cs,cost);
         cost += std::abs(r.y-y_coord.at(cell_id))+std::abs(cs.back().x+cs.back().w-width.at(cell_id)-x_coord.at(cell_id));
     }
@@ -402,8 +408,6 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
         r.cells.push_back(cell_id);
         row_index.at(row_id).first = subrow;
     } 
-    //std::cout<<cost<<std::endl;
-    //exit(1);
     return cost; 
 }
 
@@ -423,7 +427,6 @@ void Abacus::getPosition(){
                 x += width.at(r.cells.at(i));
             }
         }
-        //std::cout<<m_total_cost<<std::endl;
     }
 #ifdef DEBUG
     M_Assert(counter2==m_num_nodes-m_num_terminals,intsToString(counter2,m_num_nodes-m_num_terminals));
