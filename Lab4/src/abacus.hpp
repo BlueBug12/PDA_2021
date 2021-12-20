@@ -17,6 +17,7 @@
 #include <sstream>
 #include <numeric>
 #include <climits>
+#include <cmath>
 #include <map>
 #include <algorithm>
 #include <assert.h>
@@ -54,6 +55,8 @@ public:
     std::vector<int>height;
     std::vector<int>x_coord;
     std::vector<int>y_coord;
+    std::vector<int>ori_x;
+    std::vector<int>ori_y;
     std::vector<int>order;
     std::vector<std::string>cell_names;
 
@@ -63,6 +66,7 @@ private:
     int m_row_base_height;
     int m_num_nodes;
     int m_num_terminals;    
+    long long int m_total_cost;
 };
 
 #endif

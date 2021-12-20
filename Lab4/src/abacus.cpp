@@ -22,6 +22,7 @@ std::string intsToString(int v1,int v2){
 }
 
 Abacus::Abacus(const std::string aux_file){
+    m_total_cost = 0;
     parser(aux_file);
 }
 void Abacus::parser(const std::string& aux_file){
@@ -77,6 +78,8 @@ void Abacus::plParser(const std::string& pl_file){
         y_coord.push_back(y);
         cell_names.push_back(std::move(cell_name));
     }
+    ori_x = x_coord;
+    ori_y = y_coord;
     fin.close();
 }
 void Abacus::sclParser(const std::string& scl_file, std::vector<std::pair<int,int>>&row_range){
@@ -187,8 +190,8 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
             ++lower_bound;
         }
     }
-    int start_index = (int)rows.size();
     F(m_num_rows){
+        int start_index = (int)rows.size();
         int beg = row_range.at(i).first;
         int end = row_range.at(i).second;
         int row_height = m_row_base_height+i*m_cell_height;
@@ -222,6 +225,12 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
         }
 		row_index.push_back({start_index,(int)rows.size()});
 #ifdef DEBUG
+        assert(row_index.back().first<=row_index.back().second);
+        if(row_index.size()==1){
+            assert(row_index.front().first == 0);
+        }else{
+            assert(row_index.back().first == row_index.at(row_index.size()-2).second);
+        }
         assert(start_index!=(int)rows.size());
 		for(;start_index<(int)rows.size();++start_index){
 			Row& r = rows.at(start_index);
@@ -246,6 +255,7 @@ void Abacus::genRows(std::vector<std::pair<int,int>>& row_range){//split row by 
 			assert(x2<=r_x1 || x1>=r_x2 || y2 <= r_y1 || y1 >=r_y2);
 		}
 	}
+    assert((int)row_index.size()==m_num_rows);
 #endif
 }
 
@@ -265,12 +275,10 @@ void Abacus::run(){
             });
 
     for(int cell_id: order){
-        //std::cout<<"coordinate:"<<x_coord[cell_id]<<","<<y_coord[cell_id]<<std::endl;
         int center = searchRow(cell_id);
         int best_row = center;
         int best_cost = placeRow(cell_id, center);
-        //std::cout<<"initial cost:"<<best_cost<<std::endl;
-        for(int up = center+1;up<center+6;++up){
+        for(int up = center+1;up<center+13;++up){
             if(up>=m_num_rows)
                 break;
             int cost = placeRow(cell_id, up);
@@ -279,7 +287,7 @@ void Abacus::run(){
                 best_row = up;
             }
         }
-        for(int down = center-1;down>=center-6;--down){
+        for(int down = center-1;down>=center-13;--down){
             if(down<0)
                 break;
             int cost = placeRow(cell_id, down);
@@ -289,12 +297,12 @@ void Abacus::run(){
             }
         }
 #ifdef DEBUG
-        //std::cout<<"best cost"<<best_cost<<std::endl;
         assert(best_cost!=INT_MAX);
 #endif
         placeRow(cell_id,best_row,false);
     }
     getPosition();
+    std::cout<<"total cost:"<<m_total_cost<<std::endl;
 }
 
 void Abacus::addCell(Cluster &c, int cell_id, int row_id){//may need to meet the constraint
@@ -318,7 +326,7 @@ void Abacus::collapse(const int x_min, const int x_max, std::vector<Cluster>& cl
     Cluster &c = clusters.back();
 	int optimal_x = c.q/c.e;
     optimal_x = prune(optimal_x, x_min, x_max-c.w);
-    cost += c.e*std::abs(optimal_x-c.x);
+    //cost += c.e*std::abs(optimal_x-c.x);
     c.x = optimal_x;
     if(clusters.size() > 1){
         Cluster &pre_c = clusters.at(clusters.size()-2) ;
@@ -352,11 +360,9 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
     while(rows.at(subrow).space < width.at(cell_id)){
         ++subrow;
         if(subrow == row_index.at(row_id).second){
-            row_index.at(row_id).first = subrow;
             return INT_MAX;
         }
     }
-    row_index.at(row_id).first = subrow;
     Row &r = rows.at(subrow);
     if(recover){
         saver = r.clusters;
@@ -368,10 +374,12 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
         addCell(c,cell_id,subrow);
         cs.push_back(std::move(c));
         cost = std::abs(r.y-y_coord.at(cell_id))+std::abs(pos_x - x_coord.at(cell_id));
+        //std::cout<<x_coord[cell_id]<<"->"<<pos_x<<":"<<y_coord[cell_id]<<"->"<<r.y<<std::endl;
     }else{
         addCell(cs.back(),cell_id,subrow);
-        cost = std::abs(r.y-y_coord.at(cell_id))+std::abs(pos_x - x_coord.at(cell_id));
+        //cost = std::pow(r.y-y_coord.at(cell_id),2)+std::pow(pos_x - x_coord.at(cell_id),2);
         collapse(r.left_x,r.right_x,cs,cost);
+        cost += std::abs(r.y-y_coord.at(cell_id))+std::abs(cs.back().x+cs.back().w-width.at(cell_id)-x_coord.at(cell_id));
     }
 #ifdef DEBUG
     if(!cs.empty()){
@@ -392,7 +400,10 @@ int Abacus::placeRow(int cell_id, int row_id, bool recover){
         r.space += width.at(cell_id);
     }else{
         r.cells.push_back(cell_id);
+        row_index.at(row_id).first = subrow;
     } 
+    //std::cout<<cost<<std::endl;
+    //exit(1);
     return cost; 
 }
 
@@ -405,11 +416,14 @@ void Abacus::getPosition(){
             int x = c.x;
             for(int i=c.beg;i<=c.end;++i){
                 ++counter;
+                m_total_cost+= std::abs(x_coord.at(r.cells.at(i)) - x);
+                m_total_cost+= std::abs(y_coord.at(r.cells.at(i)) - r.y);
                 x_coord.at(r.cells.at(i)) = x;
                 y_coord.at(r.cells.at(i)) = r.y;
                 x += width.at(r.cells.at(i));
             }
         }
+        //std::cout<<m_total_cost<<std::endl;
     }
 #ifdef DEBUG
     M_Assert(counter2==m_num_nodes-m_num_terminals,intsToString(counter2,m_num_nodes-m_num_terminals));
@@ -440,12 +454,20 @@ void Abacus::writeGDT(std::string file_name){
             << r.right_x << " " << r.y << ")}" << std::endl; 
     }
     
-    //cell
+    //legalized cell
     F(m_num_nodes-m_num_terminals){
         fout << "b{" << "2" << " xy(" << x_coord[i] << " " << y_coord[i] << " " 
             << x_coord[i] << " " << y_coord[i] + height[i] << " "
             << x_coord[i] + width[i] << " " << y_coord[i] + height[i] << " "
             << x_coord[i] + width[i] << " " << y_coord[i] << ")}" << std::endl;
+    }
+    
+    //original cell
+    F(m_num_nodes-m_num_terminals){
+        fout << "b{" << "3" << " xy(" << ori_x[i] << " " << ori_y[i] << " " 
+            << ori_x[i] << " " << ori_y[i] + height[i] << " "
+            << ori_x[i] + width[i] << " " << ori_y[i] + height[i] << " "
+            << ori_x[i] + width[i] << " " << ori_y[i] << ")}" << std::endl;
     }
 
     fout << "}\n}\n";
