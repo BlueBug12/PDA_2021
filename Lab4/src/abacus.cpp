@@ -1,4 +1,5 @@
 #include "abacus.hpp"
+#define THREAD_NUM 4
 void __M_Assert(const char* expr_str, bool expr, const char* file, const char* function, int line, const std::string msg)
 {
     if (!expr)
@@ -21,8 +22,9 @@ std::string intsToString(int v1,int v2){
 	return std::to_string(v1) + "," + std::to_string(v2);
 }
 
-Abacus::Abacus(const std::string aux_file){
+Abacus::Abacus(const std::string aux_file, int thread_num){
     m_total_cost = 0;
+    m_threads = thread_num;
     parser(aux_file);
 }
 void Abacus::parser(const std::string& aux_file){
@@ -268,18 +270,63 @@ int Abacus::searchRow(int cell_id){
     return prune(y,0,m_num_rows-1);
 }
 void Abacus::run(){
-    order.resize(m_num_nodes-m_num_terminals);    
+	order.resize(m_num_nodes-m_num_terminals);    
     std::iota(order.begin(),order.end(),0);
     std::sort(order.begin(),order.end(),
             [&](int v1, int v2){return x_coord.at(v1) < x_coord.at(v2);
             });
+    int thread_num = 0;
 
-    for(int cell_id: order){
-        int center = searchRow(cell_id);
+#pragma omp parallel num_threads(m_threads)
+    thread_num = omp_get_num_threads();
+
+    int ave_cell = (int)order.size()/thread_num;
+    std::vector<int>row_recorder[m_num_rows];
+    std::vector<std::pair<int,int>>tracks[thread_num];//cell_id,row
+    for(size_t i=0;i<order.size();++i){
+        int r = searchRow(order.at(i));
+        row_recorder[r].push_back(i);
+    }
+    int group = 0;
+    std::vector<int>position{0};
+    for(int i=0;i<m_num_rows;++i){
+        int cur_size = tracks[group].size();
+        int next_size = row_recorder[i].size();
+        if(group!=thread_num-1 && cur_size+next_size>ave_cell && cur_size+next_size-ave_cell>ave_cell-cur_size){
+            std::sort(tracks[group].begin(),tracks[group].end());
+            ++group;
+            position.push_back(i);
+        }
+        for(int j : row_recorder[i]){
+            tracks[group].push_back({j,i});
+        }
+    }
+    std::sort(tracks[group].begin(),tracks[group].end());
+    position.push_back(m_num_rows);
+    /*
+    std::cout<<m_num_rows<<std::endl;
+    std::cout<<"position size: "<<position.size()<<std::endl;
+    for(int i=0;i<position.size();++i){
+        std::cout<<position[i]<<std::endl;
+    }
+
+    std::cout<<"ave cell number: "<<ave_cell<<std::endl;
+    for(int i=0;i<thread_num;++i){
+        std::cout<<tracks[i].size()<<std::endl;
+    }*/
+
+
+#pragma omp parallel num_threads(thread_num)
+{
+    int t_id = omp_get_thread_num();
+    std::vector<std::pair<int,int>>& rows_for_thread = tracks[t_id];
+    for(size_t i=0;i<rows_for_thread.size();++i){
+        int center = rows_for_thread.at(i).second;
+        int cell_id = order[rows_for_thread.at(i).first];
         int best_row = center;
         int best_cost = placeRow(cell_id, center);
-        for(int up = center+1;std::abs(up*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;++up){
-            if(up>=m_num_rows)
+        for(int up = center+1;std::abs(up*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;up+=1){
+            if(up>=position[t_id+1])
                 break;
             int cost = placeRow(cell_id, up);
             if(cost < best_cost){
@@ -287,8 +334,8 @@ void Abacus::run(){
                 best_row = up;
             }
         }
-        for(int down = center-1;std::abs(down*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;--down){
-            if(down<0)
+        for(int down = center-1;std::abs(down*m_cell_height+m_row_base_height-y_coord.at(cell_id))<best_cost;down-=1){
+            if(down<position[t_id])
                 break;
             int cost = placeRow(cell_id, down);
             if(cost < best_cost){
@@ -296,11 +343,9 @@ void Abacus::run(){
                 best_row = down;
             }
         }
-#ifdef DEBUG
-        assert(best_cost!=INT_MAX);
-#endif
         placeRow(cell_id,best_row,false);
     }
+}
     getPosition();
     std::cout<<"total cost:"<<m_total_cost<<std::endl;
 }

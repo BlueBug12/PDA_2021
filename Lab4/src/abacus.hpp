@@ -3,7 +3,7 @@
 
 #define F(n) for(int i=0;i<n;++i)
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #   define M_Assert(Expr, Msg)  __M_Assert(#Expr, Expr, __FILE__, __FUNCTION__, __LINE__, Msg)
 #else
@@ -20,13 +20,15 @@
 #include <cmath>
 #include <map>
 #include <algorithm>
+#include <omp.h>
+//#include <pthread.h>
 #include <assert.h>
 #include "data_struct.hpp"
 
 class Abacus{
 public:
     Abacus() = delete;
-    Abacus(const std::string aux_file);
+    Abacus(const std::string aux_file, int thread_num);
     Abacus(Abacus const &) = delete;
     Abacus(Abacus &&) = delete;
     Abacus & operator=(Abacus const &) = delete;
@@ -66,6 +68,7 @@ private:
     int m_row_base_height;
     int m_num_nodes;
     int m_num_terminals;    
+    int m_threads;
     long long int m_total_cost;
 };
 
