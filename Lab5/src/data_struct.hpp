@@ -48,6 +48,7 @@ struct Seg{
     ~Seg() = default;
     
     const int net_id;
+    bool close = false;
     int beg;
     int end;
     int track_id = -1;

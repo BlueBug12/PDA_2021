@@ -11,7 +11,8 @@ GreedyCR::GreedyCR(const std::string filename, int icw, int mjl, int snc):m_init
 }
 void GreedyCR::initialize(){
     channel_width = m_initial_channel_width;
-    frontier.resize(channel_width,nullptr);//plus edge
+    dummy = new Seg(0);
+    frontier.resize(channel_width,dummy);//plus edge
     tracks.resize(channel_width);//plus edge
     column_number = pins[0].size();
     columns.resize(column_number);
@@ -47,7 +48,6 @@ void GreedyCR::initialize(){
     }
     
     frontier.push_front(edge[0].front());
-    std::cout<<(*frontier.begin())->net_id<<std::endl;
     frontier.push_back(edge[1].front());
     tracks.push_front(std::move(edge[0]));
     tracks.push_back(std::move(edge[1]));
@@ -104,13 +104,19 @@ void GreedyCR::parser(const std::string & filename){
 
 void GreedyCR::run(){
     for(int i=0;i<column_number;++i){
+        std::cout << i << std::endl;
         nets.at(pins[0][i]).cur_pos[0]++;
         nets.at(pins[1][i]).cur_pos[1]++;
         stepA(i);
+        std::cout<<"finish step A"<<std::endl;
         stepB(i);
+        std::cout<<"finish step B"<<std::endl;
+        stepC(i);
+        stepD(i);
+        stepE(i);
+        stepF(i);
         writeGDT("test.gdt");
-        std::cout<<"test"<<std::endl;
-        break;
+        //break;
 
     }
 }
@@ -118,11 +124,14 @@ void GreedyCR::run(){
 void GreedyCR::stepA(int cur_col){
     int top_p = pins[0][cur_col];
     int bot_p = pins[1][cur_col];
+    beg_it = std::next(frontier.begin());
+    end_it = std::prev(frontier.end());
     if(top_p==0 && bot_p==0){
         return;
     }
     if(top_p==bot_p){
         nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),frontier.back()));
+        beg_it = std::prev(end_it);
         return;
     }
     int top_dis = 1;
@@ -131,18 +140,25 @@ void GreedyCR::stepA(int cur_col){
     Seg *bot_ptr = nullptr;
     if(top_p!=0){    
         for(auto iter = std::next(frontier.begin());iter!=std::prev(frontier.end());++iter){
-            if(*iter==nullptr){
+#ifdef DEBUG
+            assert(*iter!=nullptr);
+#endif
+            if((*iter)->net_id==0){
                 Seg *s = new Seg(top_p,cur_col);
                 nets.at(top_p).counter++;
+                nets.at(top_p).segments.push_back(s);
                 *iter = s;
                 auto t_iter = tracks.begin();
-                while(top_dis--!=0){
-                    t_iter++;
-                }
+                std::advance(t_iter,top_dis);
+#ifdef DEBUG
+                assert(std::distance(tracks.begin(),t_iter)==std::distance(frontier.begin(),iter));
+#endif
                 t_iter->push_back(s);
                 nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),s));
+                beg_it = iter;
                 break;
             }else if((*iter)->net_id==top_p){
+                beg_it = iter;
                 top_ptr = *iter;
                 break;
             }
@@ -151,18 +167,30 @@ void GreedyCR::stepA(int cur_col){
     }
     if(bot_p!=0){
         for(auto iter = std::next(frontier.rbegin());iter!=std::prev(frontier.rend());++iter){//reverse order
-            if(*iter==nullptr){
+#ifdef DEBUG
+            assert(*iter!=nullptr);
+#endif
+            if((*iter)->net_id==0){//empty track
                 Seg *s = new Seg(bot_p,cur_col);
                 nets.at(bot_p).counter++;
+                nets.at(bot_p).segments.push_back(s);
                 *iter = s;
                 auto t_iter = tracks.rbegin();
-                while(bot_dis--!=0){
-                    t_iter++;
-                }
+                std::advance(t_iter,bot_dis);
+#ifdef DEBUG
+                assert(std::distance(tracks.rbegin(),t_iter)==std::distance(frontier.rbegin(),iter));
+#endif
                 t_iter->push_back(s);
                 nets.at(bot_p).jogs.push_back(new Jog(bot_p,cur_col,s,frontier.back()));
+                end_it = frontier.begin();
+                std::advance(end_it,channel_width+1-bot_dis);
+#ifdef DEBUG
+                assert(*end_it==*iter);
+#endif
                 break;
             }else if((*iter)->net_id==bot_p){
+                end_it = frontier.begin();
+                std::advance(end_it,channel_width+1-bot_dis);
                 bot_ptr = *iter;
                 break;
             }
@@ -173,8 +201,10 @@ void GreedyCR::stepA(int cur_col){
         if(top_dis+bot_dis>channel_width+1){//wire intersecting
             if(top_dis<bot_dis){
                 nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),top_ptr));
+                end_it = std::prev(frontier.end());
             }else{
                 nets.at(bot_p).jogs.push_back(new Jog(bot_p,cur_col,bot_ptr,frontier.back()));
+                beg_it = std::next(frontier.begin());
             }
         }else{
             nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),top_ptr));
@@ -182,57 +212,141 @@ void GreedyCR::stepA(int cur_col){
         }
     }else if(top_ptr!=nullptr){
         nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),top_ptr));
+        end_it = std::prev(frontier.end());
     }else if(bot_ptr!=nullptr){
         nets.at(bot_p).jogs.push_back(new Jog(bot_p,cur_col,bot_ptr,frontier.back()));
+        beg_it = std::next(frontier.begin());
     }else{
-
+        //beg_it = std::next(frontier.begin());
+        //end_it = std::prev(frontier.end());
     }
 }
 
 void GreedyCR::stepB(int cur_col){
+    if(beg_it==end_it){
+        return;
+    }
     //pair <empty_track,jog_length>
     std::map<std::pair<int,int>,std::vector<std::pair<Seg *,Seg *>>,std::greater<std::pair<int,int>>>m;
-    auto beg_it = std::next(frontier.begin());
-    auto end_it = std::prev(frontier.end());
+#ifdef DEBUG
+    for(Seg *s:frontier){
+        assert(s!=nullptr);
+    }
+#endif
     for(auto iter_i = beg_it;iter_i!=std::prev(end_it);++iter_i){
-        if((*iter_i)==nullptr || nets.at((*iter_i)->net_id).counter==0){
+        Seg *s_i = *iter_i;
+        if(nets.at(s_i->net_id).counter==0){
             continue;
         }
-        int target_id = (*iter_i)->net_id;
+        int target_id = s_i->net_id;
         int jog_len = 0;
         int free_tracks = 0;
         std::vector<std::pair<Seg *,Seg *>>pattern;
         for(auto iter_j = iter_i;iter_j!=std::prev(end_it);++iter_j){
-            if((*iter_j)==nullptr || nets.at((*iter_j)->net_id).counter==0){
+            Seg *s_j = *iter_j;
+#ifdef DEBUG
+            assert(s_j!=nullptr);
+#endif
+            if(nets.at(s_j->net_id).counter==0){
                 continue;
             }
-            target_id = (*iter_j)->net_id;
-            Seg *beg_s = *iter_j;
+            target_id = s_j->net_id;
             for(auto iter_k = std::next(iter_j);iter_k!=end_it;++iter_k){
-                if((*iter_k)==nullptr)
-                    continue;
-                if(target_id==(*iter_k)->net_id){
+                Seg *s_k = *iter_k;
+#ifdef DEBUG
+                assert(s_k!=nullptr);
+#endif
+                if(target_id==s_k->net_id){
                    jog_len += std::distance(iter_j,iter_k);
                    free_tracks++;
                    Net & n = nets.at(target_id);
                    if(n.cur_pos[0]>=(int)n.pin_pos[0].size() && n.cur_pos[1]>=(int)n.pin_pos[1].size()){
                         free_tracks++; 
                    }
-                   pattern.push_back({beg_s,*iter_k});
-                   iter_j = iter_k;
+#ifdef DEBUG
+                   assert(s_j!=nullptr);
+                   assert(s_k!=nullptr);
+#endif
+                   pattern.push_back({s_j,s_k});
+                   iter_j = std::prev(iter_k);
                    break;
                 }
             }
+            /*
+            if(iter_j==end_it){
+                break;    
+            }*/
         }
         if(!pattern.empty()){
             m[{free_tracks,jog_len}] = std::move(pattern);
         }
     }
-    for(auto pair:m){
-        std::cout<<pair.first.first<<":"<<pair.first.second<<std::endl;
+    if(!m.empty()){
+        std::vector<std::pair<Seg *,Seg*>>&v = m.begin()->second;
+        for(int i=0;i<(int)v.size();++i){
+            Seg *beg = v[i].first;
+            Seg *end = v[i].second;
+            int beg_dis = 0;
+            int end_dis = 0;
+            for(auto iter = frontier.begin();*iter!=beg;++iter){
+                beg_dis++;
+            }
+            for(auto iter = frontier.rbegin();*iter!=end;++iter){
+                end_dis++;
+            }
+            
+#ifdef DEBUG
+            assert(beg!=nullptr);
+            assert(end!=nullptr);
+#endif
+            int n_id = beg->net_id;
+            nets.at(n_id).jogs.push_back(new Jog(n_id,cur_col,beg,end));
+            if(beg_dis==0){
+                beg->close = true;    
+            }else if(end_dis==0){
+                end->close = true;
+            }else if(beg_dis<=end_dis){
+                end->close = true;
+            }else{
+                beg->close = true;
+            }
+        }
     }
 }
 
+void GreedyCR::stepC(int cur_col){
+    
+}
+
+void GreedyCR::stepD(int cur_col){
+    
+}
+
+void GreedyCR::stepE(int cur_col){
+
+}
+
+void GreedyCR::stepF(int cur_col){
+   for(auto iter = std::next(frontier.begin());iter!=std::prev(frontier.end());++iter){
+       Seg *s = *iter;
+       if(s->net_id==0 || s->close){
+           *iter = dummy;
+           continue;
+       }
+       Net & n = nets.at(s->net_id);
+       if(n.cur_pos[0]<(int)n.pin_pos[0].size()||n.cur_pos[1]<(int)n.pin_pos[1].size()){
+#ifdef DEBUG
+           if(iter!=frontier.begin() && iter!=std::prev(frontier.end())){
+               assert(s->beg!=-1);
+               assert(s->end!=-1);
+           }
+#endif
+           s->end++;
+       }else{
+           *iter = dummy;
+       }
+   } 
+}
 
 void GreedyCR::writeGDT(const std::string & filename){
     std::ofstream file{filename};
@@ -242,7 +356,7 @@ void GreedyCR::writeGDT(const std::string & filename){
     }
     file<<"gds2{600\nm=2018-09-14 14:26:15 a=2018-09-14 14:26:15\nlib 'asap7sc7p5t_24_SL' 0.1 1e-5\ncell{c=2018-09-14 14:26:15 m=2018-09-14 14:26:15 'AND2x2_ASAP7_75t_SL'\n";
     int i = 0;
-    for(auto iter = tracks.begin();iter!=tracks.end();++iter){
+    for(auto iter = tracks.rbegin();iter!=tracks.rend();++iter){
         for(int j=0;j<(int)iter->size();++j){
             iter->at(j)->track_id = i;
         }
@@ -250,12 +364,18 @@ void GreedyCR::writeGDT(const std::string & filename){
     }
     for(Net &n:nets){
         for(Jog *j:n.jogs){
-            std::cout<<j->beg<<":"<<j->end<<std::endl;
             file << "b{" << j->net_id << " xy(" << 
                 j->col - 0.1 << " " << j->beg->track_id << " " << 
                 j->col - 0.1 << " " << j->end->track_id << " " <<
                 j->col + 0.1 << " " << j->end->track_id << " " <<
                 j->col + 0.1 << " " << j->beg->track_id << ")}" << std::endl;
+        }
+        for(Seg *s:n.segments){
+            file << "b{" << s->net_id << " xy(" <<
+                s->beg - 0.1 << " " << s->track_id - 0.1 << " " <<
+                s->beg - 0.1 << " " << s->track_id + 0.1 << " " <<
+                s->end - 0.1 << " " << s->track_id + 0.1 << " " <<
+                s->end - 0.1 << " " << s->track_id - 0.1 << ")}" << std::endl;
         }
     }
     file << "}\n}\n";

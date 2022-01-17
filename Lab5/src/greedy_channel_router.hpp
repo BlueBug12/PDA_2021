@@ -34,10 +34,10 @@ public:
     void run();
     void stepA(int cur_col);
     void stepB(int cur_col);
-    void stepC();
-    void stepD();
-    void stepE();
-    void stepF();
+    void stepC(int cur_col);
+    void stepD(int cur_col);
+    void stepE(int cur_col);
+    void stepF(int cur_col);
 
     void writeOutput(const std::string & filename);
     void writeGDT(const std::string & filename);
@@ -45,12 +45,15 @@ public:
     int channel_width;
     int column_number;
     int net_number;
+    Seg *dummy;
     
 private:
     const int m_initial_channel_width;
     const int m_minimum_jog_length;
     const int m_steady_net_constant;
     
+    std::list<Seg *>::iterator beg_it;
+    std::list<Seg *>::iterator end_it;
     std::vector<int>pins[2];
     std::list<std::vector<Seg *>>tracks;
     std::vector<std::vector<Jog *>>columns;
