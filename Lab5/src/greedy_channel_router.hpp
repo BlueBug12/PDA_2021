@@ -33,7 +33,7 @@ public:
     void parser(const std::string & filename);
     void run();
     void stepA(int cur_col);
-    void stepB();
+    void stepB(int cur_col);
     void stepC();
     void stepD();
     void stepE();

@@ -72,7 +72,7 @@ struct Net{
     std::vector<Jog *>jogs;
     std::vector<Seg *>segments;
     std::vector<int>pin_pos[2];
-    int cur_pos[2] = {0,0};
+    int cur_pos[2] = {-1,-1};//{top,bot}
 };
 
 #endif
