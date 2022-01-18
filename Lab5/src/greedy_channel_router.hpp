@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <algorithm>
 #include <assert.h>
 #include "data_struct.hpp"
 
@@ -52,12 +53,12 @@ private:
     const int m_minimum_jog_length;
     const int m_steady_net_constant;
     
-    std::list<Seg *>::iterator beg_it;
-    std::list<Seg *>::iterator end_it;
+    std::list<std::pair<Seg *,int>>::iterator beg_it;
+    std::list<std::pair<Seg *,int>>::iterator end_it;
     std::vector<int>pins[2];
     std::list<std::vector<Seg *>>tracks;
     std::vector<std::vector<Jog *>>columns;
-    std::list<Seg *>frontier;
+    std::list<std::pair<Seg *,int>>frontier;//seg, net_id of jog
     std::vector<Net>nets;
     std::map<int,int>dict;
     std::vector<int>reverse;
