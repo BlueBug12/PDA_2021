@@ -58,7 +58,6 @@ private:
     Iter end_it;
     std::vector<int>pins[2];
     std::list<std::vector<Seg *>>tracks;
-    std::vector<std::vector<Jog *>>columns;
     std::list<std::pair<Seg *,int>>frontier;//seg, net_id of jog
     std::vector<Net>nets;
     std::map<int,int>dict;

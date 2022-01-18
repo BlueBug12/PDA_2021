@@ -7,7 +7,7 @@ inline bool no_pins(Net & n){
     return true;
 }
 
-GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(30),m_minimum_jog_length(5),m_steady_net_constant(10){
+GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(35),m_minimum_jog_length(5),m_steady_net_constant(10){
     parser(filename);
     initialize();
 }
@@ -23,7 +23,6 @@ void GreedyCR::initialize(){
     frontier.resize(channel_width,{dummy,0});//plus edge
     tracks.resize(channel_width);//plus edge
     column_number = pins[0].size();
-    columns.resize(column_number);
     net_number = dict.size()-1;//except 0
     F(net_number+1){
         Net n;
@@ -52,6 +51,10 @@ void GreedyCR::initialize(){
     for(int i=0;i<2;++i){
         for(int j=0;j<column_number;++j){
             Seg *s = new Seg(pins[i][j]);
+            edge[i].push_back(s);
+        }
+        for(int j=0;j<column_number;++j){
+            Seg *s = new Seg(0);
             edge[i].push_back(s);
         }
     }
@@ -146,10 +149,39 @@ void GreedyCR::run(){
             //assert(nets[i].counter==count[i]);
         }
 #endif
-        writeGDT("test.gdt");
-        //break;
+        //writeGDT("test.gdt");
 
     }
+    bool flag = false;
+    int i = column_number;
+    for(Iter iter = std::next(frontier.begin());iter!=std::prev(frontier.end());++iter){
+        if(!iter->first->close){
+            flag = true;
+            break;
+        }
+    }
+    while(flag){
+        flag = false;
+        std::cout<<"new "<<i<<std::endl;
+        for(Iter iter = std::next(frontier.begin());iter!=std::prev(frontier.end());++iter){
+            std::cout<<iter->first->net_id<<" ";
+        }
+        std::cout<<std::endl;
+        stepA(i);
+        stepB(i);
+        stepC(i);
+        stepD(i);
+        stepE(i);
+        stepF(i);    
+        for(Iter iter = std::next(frontier.begin());iter!=std::prev(frontier.end());++iter){
+            if(!iter->first->close){
+                flag = true;
+                break;
+            }
+        }
+        ++i;
+    }
+    writeGDT("test.gdt");
     writeOutput("test.txt");
     /*
     for(int i=0;i<nets.size();++i){
@@ -185,11 +217,6 @@ void GreedyCR::stepA(int cur_col){
                     iter->first->close = true;
                     nets.at(top_p).counter--;
                 }
-                /*
-                if(iter->first->net_id==top_p && nets.at(top_p).counter>1){
-                    iter->first->close = true;
-                    nets.at(top_p).counter--;
-                }*/
             }
             int top_dis = 10000000;
             int bot_dis = 10000000;
