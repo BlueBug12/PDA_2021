@@ -104,13 +104,10 @@ void GreedyCR::parser(const std::string & filename){
 
 void GreedyCR::run(){
     for(int i=0;i<column_number;++i){
-        std::cout << i << std::endl;
         nets.at(pins[0][i]).cur_pos[0]++;
         nets.at(pins[1][i]).cur_pos[1]++;
         stepA(i);
-        std::cout<<"finish step A"<<std::endl;
         stepB(i);
-        std::cout<<"finish step B"<<std::endl;
         stepC(i);
         stepD(i);
         stepE(i);
@@ -183,14 +180,14 @@ void GreedyCR::stepA(int cur_col){
                 t_iter->push_back(s);
                 nets.at(bot_p).jogs.push_back(new Jog(bot_p,cur_col,s,frontier.back()));
                 end_it = frontier.begin();
-                std::advance(end_it,channel_width+1-bot_dis);
+                std::advance(end_it,channel_width+2-bot_dis);
 #ifdef DEBUG
-                assert(*end_it==*iter);
+                assert(*std::prev(end_it)==*iter);
 #endif
                 break;
             }else if((*iter)->net_id==bot_p){
                 end_it = frontier.begin();
-                std::advance(end_it,channel_width+1-bot_dis);
+                std::advance(end_it,channel_width+2-bot_dis);
                 bot_ptr = *iter;
                 break;
             }
@@ -212,10 +209,8 @@ void GreedyCR::stepA(int cur_col){
         }
     }else if(top_ptr!=nullptr){
         nets.at(top_p).jogs.push_back(new Jog(top_p,cur_col,frontier.front(),top_ptr));
-        end_it = std::prev(frontier.end());
     }else if(bot_ptr!=nullptr){
         nets.at(bot_p).jogs.push_back(new Jog(bot_p,cur_col,bot_ptr,frontier.back()));
-        beg_it = std::next(frontier.begin());
     }else{
         //beg_it = std::next(frontier.begin());
         //end_it = std::prev(frontier.end());
@@ -223,6 +218,7 @@ void GreedyCR::stepA(int cur_col){
 }
 
 void GreedyCR::stepB(int cur_col){
+    std::cout<<"col:"<<cur_col<<"("<<std::distance(frontier.begin(),beg_it)<<","<<std::distance(end_it,std::prev(frontier.end()))<<")"<<std::endl;
     if(beg_it==end_it){
         return;
     }
@@ -257,6 +253,7 @@ void GreedyCR::stepB(int cur_col){
                 assert(s_k!=nullptr);
 #endif
                 if(target_id==s_k->net_id){
+                    std::cout<<"found"<<std::endl;
                    jog_len += std::distance(iter_j,iter_k);
                    free_tracks++;
                    Net & n = nets.at(target_id);
@@ -334,7 +331,7 @@ void GreedyCR::stepF(int cur_col){
            continue;
        }
        Net & n = nets.at(s->net_id);
-       if(n.cur_pos[0]<(int)n.pin_pos[0].size()||n.cur_pos[1]<(int)n.pin_pos[1].size()){
+       if(n.cur_pos[0]<(int)n.pin_pos[0].size()-1||n.cur_pos[1]<(int)n.pin_pos[1].size()-1){
 #ifdef DEBUG
            if(iter!=frontier.begin() && iter!=std::prev(frontier.end())){
                assert(s->beg!=-1);
