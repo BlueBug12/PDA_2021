@@ -7,7 +7,7 @@ inline bool no_pins(Net & n){
     return true;
 }
 
-GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(40),m_minimum_jog_length(5),m_steady_net_constant(10){
+GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(30),m_minimum_jog_length(5),m_steady_net_constant(10){
     parser(filename);
     initialize();
 }
@@ -150,6 +150,7 @@ void GreedyCR::run(){
         //break;
 
     }
+    writeOutput("test.txt");
     /*
     for(int i=0;i<nets.size();++i){
 
@@ -649,6 +650,37 @@ void GreedyCR::stepF(int cur_col){
            iter->second = 0;
        }
    } 
+}
+
+void GreedyCR::writeOutput(const std::string & filename){
+    
+    std::ofstream file{filename};
+    if(!file){
+        std::cerr << "Error: can not open file "<<filename<<std::endl;
+        exit(1);
+    }
+    int i = 0;
+    for(auto iter = tracks.rbegin();iter!=tracks.rend();++iter){
+        for(int j=0;j<(int)iter->size();++j){
+            iter->at(j)->track_id = i;
+        }
+        ++i;
+    }
+    for(int j = 1;j<(int)nets.size();++j){
+        Net & n = nets[j];
+        file << ".begin "<< reverse[j] << std::endl;
+        for(Jog *j:n.jogs){
+            file << ".V " << j->col << " "<< j->end->track_id << " " << j->beg->track_id <<std::endl;  
+        }
+        for(Seg *s:n.segments){
+            if(s->beg==s->end)
+                continue;
+            file << ".H " << s->beg << " " << s-> track_id << " " << s->end << std::endl;
+        }
+        file << ".end"<<std::endl;
+    }
+
+    file.close();
 }
 
 void GreedyCR::writeGDT(const std::string & filename){
