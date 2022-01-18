@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <assert.h>
 #include "data_struct.hpp"
+typedef std::list<std::pair<Seg *,int>>::iterator Iter;
 
 class GreedyCR{
 public:
@@ -39,7 +40,7 @@ public:
     void stepD(int cur_col);
     void stepE(int cur_col);
     void stepF(int cur_col);
-
+    void addJog(int net_id, Iter beg, Iter end, int cur_col, Seg* top, Seg* bot);
     void writeOutput(const std::string & filename);
     void writeGDT(const std::string & filename);
 
@@ -53,8 +54,8 @@ private:
     const int m_minimum_jog_length;
     const int m_steady_net_constant;
     
-    std::list<std::pair<Seg *,int>>::iterator beg_it;
-    std::list<std::pair<Seg *,int>>::iterator end_it;
+    Iter beg_it;
+    Iter end_it;
     std::vector<int>pins[2];
     std::list<std::vector<Seg *>>tracks;
     std::vector<std::vector<Jog *>>columns;
