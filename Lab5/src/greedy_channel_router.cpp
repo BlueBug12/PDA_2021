@@ -7,7 +7,7 @@ inline bool no_pins(Net & n){
     return true;
 }
 
-GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(35),m_minimum_jog_length(5),m_steady_net_constant(10){
+GreedyCR::GreedyCR(const std::string filename):m_initial_channel_width(29),m_minimum_jog_length(2),m_steady_net_constant(50){
     parser(filename);
     initialize();
 }
@@ -104,11 +104,6 @@ void GreedyCR::parser(const std::string & filename){
             int pin = std::stoi(str);
             assert(pin == reverse[pins[i][j]]);
         }
-        /*
-        for(int j=0;j<pins[0].size();++j){
-            std::cout << pins[i][j] << " ";
-        }
-        std::cout << std::endl;*/
     }
   fin_test.close();
 #endif
@@ -181,13 +176,6 @@ void GreedyCR::run(){
         }
         ++i;
     }
-    writeGDT("test.gdt");
-    writeOutput("test.txt");
-    /*
-    for(int i=0;i<nets.size();++i){
-
-        std::cout<<"n"<<i<<":"<<nets[i].counter<<std::endl;
-    }*/
 }
 
 void GreedyCR::stepA(int cur_col){
@@ -349,8 +337,7 @@ void GreedyCR::stepA(int cur_col){
             end_it = std::prev(frontier.end());
         }
     }else{
-        //beg_it = std::next(frontier.begin());
-        //end_it = std::prev(frontier.end());
+
     }
 #ifdef DEBUG
     assert(std::distance(frontier.begin(),beg_it)<=std::distance(frontier.begin(),end_it));
@@ -576,11 +563,6 @@ void GreedyCR::stepC(int cur_col){
 }
 
 void GreedyCR::stepD(int cur_col){
-    /* 
-    for(Iter it_i = std::next(frontier.begin());it_i!=std::prev(frontier.end());++it_i){
-        std::cout<<it_i->second<<",";
-    }
-    std::cout<<std::endl;*/
     for(Iter it_i = std::next(frontier.begin());it_i!=std::prev(frontier.end());++it_i){
         int n_id = it_i->first->net_id;
         Net & n = nets.at(n_id);

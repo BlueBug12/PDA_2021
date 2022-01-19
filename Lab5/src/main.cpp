@@ -16,6 +16,8 @@ int main(int argc, char **argv){
 
     GreedyCR *gcr = new GreedyCR(ifilename);
     gcr->run();
+    gcr->writeOutput(ofilename);
+    gcr->writeGDT("test.gdt");
     delete gcr;
     
 
