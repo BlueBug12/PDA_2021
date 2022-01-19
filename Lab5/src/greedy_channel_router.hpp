@@ -3,7 +3,7 @@
 
 #define F(n) for(int i=0;i<n;++i)
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #   define M_Assert(Expr, Msg)  __M_Assert(#Expr, Expr, __FILE__, __FUNCTION__, __LINE__, Msg)
 #else
